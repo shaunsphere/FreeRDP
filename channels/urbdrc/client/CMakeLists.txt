@@ -18,6 +18,8 @@
 
 define_channel_client("urbdrc")
 
+find_package(UDev)
+
 set(${MODULE_PREFIX}_SRCS
 	searchman.c
 	searchman.h
@@ -29,17 +31,8 @@ set(${MODULE_PREFIX}_SRCS
 	urbdrc_main.h
 	urbdrc_types.h)
 
-include_directories(..)
-
 add_channel_client_library(${MODULE_PREFIX} ${MODULE_NAME} ${CHANNEL_NAME} TRUE "DVCPluginEntry")
 
-
-
-#set(${MODULE_PREFIX}_LIBS ${${MODULE_PREFIX}_LIBS} libusb-devman)
-
-set(${MODULE_PREFIX}_LIBS
-    ${DBUS_GLIB_LIBRARIES}
-    ${UUID_LIBRARIES})
 if (UDEV_FOUND AND UDEV_LIBRARIES)
 	set(${MODULE_PREFIX}_LIBS ${${MODULE_PREFIX}_LIBS} ${UDEV_LIBRARIES})
 endif()

@@ -18,6 +18,11 @@
 
 define_channel_client_subsystem("urbdrc" "libusb" "")
 
+find_package(libusb-1.0)
+if (NOT LIBUSB_1_FOUND)
+    message(FATAL_ERROR "libusb-1 missing!")
+endif()
+
 set(${MODULE_PREFIX}_SRCS
 	libusb_udevman.c
 	libusb_udevice.c
@@ -26,21 +31,15 @@ set(${MODULE_PREFIX}_SRCS
 	request_queue.h)
 
 include_directories(..)
+include_directories(${LIBUSB_1_INCLUDE_DIRS})
 
 add_channel_client_subsystem_library(${MODULE_PREFIX} ${MODULE_NAME} ${CHANNEL_NAME} "" TRUE "")
 
-
-
 set(${MODULE_PREFIX}_LIBS
-	${CMAKE_THREAD_LIBS_INIT})
-
-set(${MODULE_PREFIX}_LIBS ${${MODULE_PREFIX}_LIBS}
-	${DBUS_GLIB_LIBRARIES}
-	${UUID_LIBRARIES}
-	${LIBUSB_1_LIBRARIES})
-
-
-set(${MODULE_PREFIX}_LIBS ${${MODULE_PREFIX}_LIBS} winpr)
+	${CMAKE_THREAD_LIBS_INIT}
+        ${DBUS_GLIB_LIBRARIES}
+	${LIBUSB_1_LIBRARIES}
+	winpr)
 
 target_link_libraries(${MODULE_NAME} ${${MODULE_PREFIX}_LIBS})
 
