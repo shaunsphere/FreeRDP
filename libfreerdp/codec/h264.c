@@ -1477,7 +1477,7 @@ error_1:
 	return status;
 }
 
-BOOL h264_context_init(H264_CONTEXT* h264)
+static BOOL h264_context_init(H264_CONTEXT* h264)
 {
 #if defined(_WIN32) && defined(WITH_MEDIA_FOUNDATION)
 	if (g_Subsystem_MF.Init(h264))
