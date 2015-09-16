@@ -556,7 +556,7 @@ static void* urbdrc_search_usb_device(void* arg)
 
         if (status == WAIT_OBJECT_0)
 		{
-			sem_post(&searchman->sem_term);
+			ReleaseSemaphore(searchman->sem_term, 1, NULL);
             goto out;
 		}
 
@@ -665,7 +665,7 @@ static void* urbdrc_search_usb_device(void* arg)
                         if (status == WAIT_OBJECT_0)
 						{
 							CloseHandle(mon_fd);
-							sem_post(&searchman->sem_term);
+							ReleaseSemaphore(searchman->sem_term, 1, NULL);
 							return 0;
 						}
 
@@ -737,7 +737,7 @@ static void* urbdrc_search_usb_device(void* arg)
                     if (status == WAIT_OBJECT_0)
 					{
 						CloseHandle(mon_fd);
-						sem_post(&searchman->sem_term);
+						ReleaseSemaphore(searchman->sem_term, 1, NULL);
 						return 0;
 					}
 
@@ -760,7 +760,7 @@ out:
 	CloseHandle(mon_fd);
 
 fail_create_monfd_event:
-	sem_post(&searchman->sem_term);
+	ReleaseSemaphore(searchman->sem_term, 1, NULL);
 
 	return 0;
 }
@@ -875,7 +875,7 @@ static UINT urbdrc_process_channel_notification(URBDRC_CHANNEL_CALLBACK* callbac
 
 		case RIMCALL_RELEASE:
 			WLog_VRB(TAG, "recv RIMCALL_RELEASE");
-			pthread_t thread;
+			HANDLE thread;
 
 			TRANSFER_DATA*  transfer_data;
 
@@ -899,13 +899,14 @@ static UINT urbdrc_process_channel_notification(URBDRC_CHANNEL_CALLBACK* callbac
 				transfer_data->pBuffer[i] = pBuffer[i];
 			}
 
-			if (pthread_create(&thread, 0, urbdrc_new_device_create, transfer_data) != 0)
+			thread = CreateThread(NULL, 0, (LPTHREAD_START_ROUTINE)urbdrc_new_device_create, transfer_data, 0, NULL);
+			if (!thread)
 			{
 				free(transfer_data->pBuffer);
 				free(transfer_data);
 				return ERROR_INVALID_OPERATION;
 			}
-			pthread_detach(thread);
+			CloseHandle(thread);
 			break;
 
 		default:
@@ -963,7 +964,7 @@ static UINT urbdrc_on_data_received(IWTSVirtualChannelCallback* pChannelCallback
 
 		default:
 			WLog_VRB(TAG, "InterfaceId 0x%X Start matching devices list", InterfaceId);
-			pthread_t thread;
+			HANDLE thread;
 			TRANSFER_DATA* transfer_data;
 
 			transfer_data = (TRANSFER_DATA *)malloc(sizeof(TRANSFER_DATA));
@@ -995,8 +996,8 @@ static UINT urbdrc_on_data_received(IWTSVirtualChannelCallback* pChannelCallback
 			func_lock_isoch_mutex(transfer_data);
 #endif
 
-			error = pthread_create(&thread, 0, urbdrc_process_udev_data_transfer, transfer_data);
-			if (error != 0)
+			thread = CreateThread(NULL, 0, (LPTHREAD_START_ROUTINE)urbdrc_process_udev_data_transfer, transfer_data, 0, NULL);
+			if (!thread)
 			{
 				WLog_ERR(TAG, "Create Data Transfer Thread got error = %d", error);
 				free(transfer_data->pBuffer);
@@ -1004,7 +1005,7 @@ static UINT urbdrc_on_data_received(IWTSVirtualChannelCallback* pChannelCallback
 				return ERROR_INVALID_OPERATION;
 			}
 
-			pthread_detach(thread);
+			CloseHandle(thread);
 			break;
 	}
 
@@ -1136,12 +1137,7 @@ static UINT urbdrc_plugin_terminated(IWTSPlugin* pPlugin)
 
 		/* free searchman */
 		if (searchman->started)
-		{
-			struct timespec ts;
-			ts.tv_sec = time(NULL)+10;
-			ts.tv_nsec = 0;
-			sem_timedwait(&searchman->sem_term, &ts);
-		}
+			WaitForSingleObject(searchman->sem_term, INFINITE);
 
 		searchman->free(searchman);
 		searchman = NULL;
@@ -1229,7 +1225,7 @@ static UINT urbdrc_process_addin_args(URBDRC_PLUGIN* urbdrc, ADDIN_ARGV* args)
 	DWORD flags;
 	COMMAND_LINE_ARGUMENT_A* arg;
 
-    flags = COMMAND_LINE_SIGIL_NONE | COMMAND_LINE_SEPARATOR_COLON | COMMAND_LINE_IGN_UNKNOWN_KEYWORD;
+	flags = COMMAND_LINE_SIGIL_NONE | COMMAND_LINE_SEPARATOR_COLON | COMMAND_LINE_IGN_UNKNOWN_KEYWORD;
 
 	status = CommandLineParseArgumentsA(args->argc, (const char**) args->argv,
 			urbdrc_args, flags, urbdrc, NULL, NULL);
@@ -1305,15 +1301,15 @@ UINT DVCPluginEntry(IDRDYNVC_ENTRY_POINTS* pEntryPoints)
 	if (status != CHANNEL_RC_OK)
 	{
 		WLog_ERR(TAG, "error processing arguments");
-        goto error_register;
+		goto error_register;
 	}
 
 
 	if (!urbdrc->subsystem && !urbdrc_set_subsystem(urbdrc, "libusb"))
-    {
+	{
 		WLog_ERR(TAG, "error setting subsystem");
-        status = ERROR_OUTOFMEMORY;
-        goto error_register;
+		status = ERROR_OUTOFMEMORY;
+		goto error_register;
 	}
 
 	return urbdrc_load_udevman_addin((IWTSPlugin*) urbdrc, urbdrc->subsystem, args);

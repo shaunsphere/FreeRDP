@@ -31,8 +31,8 @@ typedef struct _ISOCH_CALLBACK_QUEUE ISOCH_CALLBACK_QUEUE;
 struct _ISOCH_CALLBACK_DATA
 {
 	void * inode;
-	void * prev;
-	void * next;
+    struct _ISOCH_CALLBACK_DATA * prev;
+    struct _ISOCH_CALLBACK_DATA * next;
 	void * device;
 	BYTE * out_data;
 	UINT32 out_size;
@@ -48,22 +48,19 @@ struct _ISOCH_CALLBACK_QUEUE
 	ISOCH_CALLBACK_DATA* head; /* head point in linked list */
 	ISOCH_CALLBACK_DATA* tail; /* tail point in linked list */
 	
-	pthread_mutex_t isoch_loading;
+    HANDLE isoch_loading;
 	
 	/* Isochronous queue service */
-	void (*rewind) (ISOCH_CALLBACK_QUEUE * queue);
+    BOOL (*rewind) (ISOCH_CALLBACK_QUEUE * queue);
 	BOOL (*has_next) (ISOCH_CALLBACK_QUEUE * queue);
 	int (*unregister_data) (ISOCH_CALLBACK_QUEUE* queue, ISOCH_CALLBACK_DATA* isoch);
 	ISOCH_CALLBACK_DATA *(*get_next) (ISOCH_CALLBACK_QUEUE * queue);
 	ISOCH_CALLBACK_DATA *(*register_data) (ISOCH_CALLBACK_QUEUE* queue, 
 		void * callback, void * dev);
-	void (*free) (ISOCH_CALLBACK_QUEUE * queue);
+    void (*free) (ISOCH_CALLBACK_QUEUE * queue);
 	
 };
 
-
 ISOCH_CALLBACK_QUEUE* isoch_queue_new(void);
-
-	
 
 #endif /* __ISOCH_QUEUE_H */

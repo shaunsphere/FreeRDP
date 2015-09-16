@@ -74,11 +74,11 @@ static int func_check_isochronous_fds(IUDEVICE* pdev)
 		if (isoch_queue == NULL || !pdev)
 			return -1;
 
-		pthread_mutex_lock(&isoch_queue->isoch_loading);
+		WaitForSingleObject(isoch_queue->isoch_loading, INFINITE);
 
 		if (isoch_queue->head == NULL)
 		{
-			pthread_mutex_unlock(&isoch_queue->isoch_loading);
+			ReleaseMutex(isoch_queue->isoch_loading);
 			continue;
 		}
 		else
@@ -88,7 +88,7 @@ static int func_check_isochronous_fds(IUDEVICE* pdev)
 
 		if (!isoch || !isoch->out_data)
 		{
-			pthread_mutex_unlock(&isoch_queue->isoch_loading);
+			ReleaseMutex(isoch_queue->isoch_loading);
 			continue;
 		}
 		else
@@ -102,12 +102,12 @@ static int func_check_isochronous_fds(IUDEVICE* pdev)
 			if (!ret)
 				WLog_DBG(TAG, "isoch_queue_unregister_data: Not found isoch data!!");
 
-			pthread_mutex_unlock(&isoch_queue->isoch_loading);
+			ReleaseMutex(isoch_queue->isoch_loading);
 
 			if (pdev && !pdev->isSigToEnd(pdev))
 			{
 				callback->channel->Write(callback->channel, size_temp, data_temp, NULL);
-				zfree(data_temp);
+				free(data_temp);
 			}
 		}
 	}
@@ -950,10 +950,10 @@ static int urb_isoch_transfer(URBDRC_CHANNEL_CALLBACK * callback, BYTE * data,
 
 #if ISOCH_FIFO
 	if(!noAck){
-		pthread_mutex_lock(&isoch_queue->isoch_loading);
+		WaitForSingleObject(isoch_queue->isoch_loading, INFINITE);
 		isoch->out_data = out_data;
 		isoch->out_size = out_size;
-		pthread_mutex_unlock(&isoch_queue->isoch_loading);
+		ReleaseMutex(isoch_queue->isoch_loading);
 	}
 #else
 	if (!pdev->isSigToEnd(pdev))

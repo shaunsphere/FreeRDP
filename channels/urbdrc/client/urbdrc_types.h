@@ -35,8 +35,6 @@
 #else
 #include <uuid/uuid.h>
 #endif
-#include <pthread.h>
-#include <semaphore.h>
 
 #include <winpr/stream.h>
 

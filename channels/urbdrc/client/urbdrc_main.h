@@ -133,29 +133,29 @@ struct _IUDEVICE
 		BYTE InterfaceNumber, BYTE Ms_PageIndex, UINT16 Ms_featureDescIndex, UINT32* UsbdStatus,
 		UINT32* BufferSize, BYTE* Buffer, int Timeout);
 
-	void (*cancel_all_transfer_request) (IUDEVICE* idev);
+    BOOL (*cancel_all_transfer_request) (IUDEVICE* idev);
 
 	int (*cancel_transfer_request) (IUDEVICE* idev, UINT32 RequestId);
 
 	int (*query_device_descriptor) (IUDEVICE* idev, int offset);
 
-	void (*detach_kernel_driver) (IUDEVICE* idev);
+    BOOL (*detach_kernel_driver) (IUDEVICE* idev);
 
-	void (*attach_kernel_driver) (IUDEVICE* idev);
+    BOOL (*attach_kernel_driver) (IUDEVICE* idev);
 
 	int (*wait_action_completion) (IUDEVICE* idev);
 
-	void (*push_action) (IUDEVICE* idev);
+    BOOL (*push_action) (IUDEVICE* idev);
 
-	void (*complete_action) (IUDEVICE* idev);
+    BOOL (*complete_action) (IUDEVICE* idev);
 
 	/* Wait for 5 sec */
 	int (*wait_for_detach) (IUDEVICE* idev);
 
 	/* FIXME: Currently this is a way of stupid, SHOULD to improve it.
 	 *        Isochronous transfer must to FIFO */
-	void (*lock_fifo_isoch) (IUDEVICE* idev);
-	void (*unlock_fifo_isoch) (IUDEVICE* idev);
+    BOOL (*lock_fifo_isoch) (IUDEVICE* idev);
+    BOOL (*unlock_fifo_isoch) (IUDEVICE* idev);
 
 	int (*query_device_port_status) (IUDEVICE* idev, UINT32 *UsbdStatus,
 		UINT32* BufferSize,
@@ -171,9 +171,9 @@ struct _IUDEVICE
 	int (*isExist) (IUDEVICE* idev);
 	int (*isAlreadySend) (IUDEVICE* idev);
 	int (*isChannelClosed) (IUDEVICE* idev);
-	void (*SigToEnd) (IUDEVICE* idev);
-	void (*setAlreadySend) (IUDEVICE* idev);
-	void (*setChannelClosed) (IUDEVICE* idev);
+    BOOL (*SigToEnd) (IUDEVICE* idev);
+    BOOL (*setAlreadySend) (IUDEVICE* idev);
+    BOOL (*setChannelClosed) (IUDEVICE* idev);
 	char *(*getPath) (IUDEVICE* idev);
 
 	BASIC_DEV_STATE_DEFINED(channel_id, UINT32);
@@ -191,6 +191,7 @@ struct _IUDEVICE
 
 	/* Control semaphore or mutex lock */
 
+	void (*free)(IUDEVICE* idev);
 };
 
 struct _IUDEVMAN
@@ -199,7 +200,7 @@ struct _IUDEVMAN
 	void (*free) (IUDEVMAN* idevman);
 
 	/* Manage devices */
-	void (*rewind) (IUDEVMAN* idevman);
+    BOOL (*rewind) (IUDEVMAN* idevman);
 	int (*has_next) (IUDEVMAN* idevman);
 	int (*unregister_udevice) (IUDEVMAN* idevman, int bus_number, int dev_number);
 	int (*register_udevice) (IUDEVMAN* idevman, int bus_number,
@@ -218,10 +219,10 @@ struct _IUDEVMAN
 	BASIC_DEVMAN_STATE_DEFINED(sem_timeout, int);
 
 	/* control semaphore or mutex lock */
-	void (*loading_lock) (IUDEVMAN* idevman);
-	void (*loading_unlock) (IUDEVMAN* idevman);
-	void (*push_urb) (IUDEVMAN* idevman);
-	void (*wait_urb) (IUDEVMAN* idevman);
+    BOOL (*loading_lock) (IUDEVMAN* idevman);
+    BOOL (*loading_unlock) (IUDEVMAN* idevman);
+    BOOL (*push_urb) (IUDEVMAN* idevman);
+    BOOL (*wait_urb) (IUDEVMAN* idevman);
 };
 
 #endif /* __URBDRC_MAIN_H */

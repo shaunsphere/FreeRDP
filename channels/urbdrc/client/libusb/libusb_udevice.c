@@ -1113,10 +1113,12 @@ static int libusb_udev_query_device_descriptor(IUDEVICE* idev, int offset)
 	return 0;
 }
 
-static void libusb_udev_detach_kernel_driver(IUDEVICE* idev)
+static BOOL libusb_udev_detach_kernel_driver(IUDEVICE* idev)
 {
 	int i, err = 0;
 	UDEVICE* pdev = (UDEVICE*) idev;
+	if (!pdev)
+		return FALSE;
 
 	if ((pdev->status & URBDRC_DEVICE_DETACH_KERNEL) == 0)
 	{		
@@ -1132,12 +1134,16 @@ static void libusb_udev_detach_kernel_driver(IUDEVICE* idev)
 		
 		pdev->status |= URBDRC_DEVICE_DETACH_KERNEL;
 	}
+
+	return TRUE;
 }
 
-static void libusb_udev_attach_kernel_driver(IUDEVICE* idev)
+static BOOL libusb_udev_attach_kernel_driver(IUDEVICE* idev)
 {
 	int i, err = 0;
 	UDEVICE* pdev = (UDEVICE*) idev;
+	if (!pdev)
+		return FALSE;
 
 	for (i = 0; i < pdev->LibusbConfig->bNumInterfaces && err != LIBUSB_ERROR_NO_DEVICE; i++)
 	{
@@ -1151,6 +1157,8 @@ static void libusb_udev_attach_kernel_driver(IUDEVICE* idev)
 			WLog_DBG(TAG,"libusb_attach_kernel_driver if%d = %d", i, err); 
 		}  
 	}
+
+	return TRUE;
 }
 
 static int libusb_udev_is_composite_device(IUDEVICE* idev)
@@ -1183,22 +1191,34 @@ static int libusb_udev_is_already_send(IUDEVICE* idev)
 	return (pdev->status & URBDRC_DEVICE_ALREADY_SEND) ? 1 : 0;
 }
 
-static void libusb_udev_signal_end(IUDEVICE* idev)
+static BOOL libusb_udev_signal_end(IUDEVICE* idev)
 {
 	UDEVICE* pdev = (UDEVICE*) idev;
+	if (!pdev)
+		return FALSE;
+
 	pdev->status |= URBDRC_DEVICE_SIGNAL_END;
+	return TRUE;
 }
 
-static void libusb_udev_channel_closed(IUDEVICE* idev)
+static BOOL libusb_udev_channel_closed(IUDEVICE* idev)
 {
 	UDEVICE* pdev = (UDEVICE*) idev;
+	if (!pdev)
+		return FALSE;
+
 	pdev->status |= URBDRC_DEVICE_CHANNEL_CLOSED;
+	return TRUE;
 }
 
-static void libusb_udev_set_already_send(IUDEVICE* idev)
+static BOOL libusb_udev_set_already_send(IUDEVICE* idev)
 {
 	UDEVICE* pdev = (UDEVICE*) idev;
+	if (!pdev)
+		return FALSE;
+
 	pdev->status |= URBDRC_DEVICE_ALREADY_SEND;
+	return TRUE;
 }
 
 static char* libusb_udev_get_path(IUDEVICE* idev)
@@ -1209,32 +1229,36 @@ static char* libusb_udev_get_path(IUDEVICE* idev)
 
 static int libusb_udev_wait_action_completion(IUDEVICE* idev)
 {
-	int error, sval;
 	UDEVICE* pdev = (UDEVICE*) idev;
 
-	while(1)
-	{
-		usleep(500000);
+	if (!pdev)
+		return -1;
 
-		error = sem_getvalue(&pdev->sem_id, &sval);
+	if (WaitForSingleObject(pdev->sem_id, INFINITE) != WAIT_OBJECT_0)
+		return -1;
 
-		if (sval == 0)
-			break;
-	}
-
-	return error;
+	return 0;
 }
 
-static void libusb_udev_push_action(IUDEVICE* idev)
+static BOOL libusb_udev_push_action(IUDEVICE* idev)
 {
 	UDEVICE* pdev = (UDEVICE*) idev;
-	sem_post(&pdev->sem_id);
+	if (!pdev)
+		return FALSE;
+
+	return ReleaseSemaphore(pdev->sem_id, 1, NULL);
 }
 
-static void libusb_udev_complete_action(IUDEVICE* idev)
+static BOOL libusb_udev_complete_action(IUDEVICE* idev)
 {
 	UDEVICE* pdev = (UDEVICE*) idev;
-	sem_trywait(&pdev->sem_id); 
+	if (!pdev)
+		return FALSE;
+
+	if (WaitForSingleObject(pdev->sem_id, 0) != WAIT_OBJECT_0)
+		return FALSE;
+
+	return TRUE;
 }
 
 static int libusb_udev_wait_for_detach(IUDEVICE* idev)
@@ -1258,16 +1282,25 @@ static int libusb_udev_wait_for_detach(IUDEVICE* idev)
 	return error;
 }
 
-static void libusb_udev_lock_fifo_isoch(IUDEVICE* idev)
+static BOOL libusb_udev_lock_fifo_isoch(IUDEVICE* idev)
 {
 	UDEVICE* pdev = (UDEVICE*) idev;
-	pthread_mutex_lock(&pdev->mutex_isoch);  
+	if (!pdev)
+		return FALSE;
+
+	if (WaitForSingleObject(pdev->mutex_isoch, INFINITE) != WAIT_OBJECT_0)
+		return FALSE;
+
+	return TRUE;
 }
 
-static void  libusb_udev_unlock_fifo_isoch(IUDEVICE* idev)
+static BOOL  libusb_udev_unlock_fifo_isoch(IUDEVICE* idev)
 {
 	UDEVICE* pdev = (UDEVICE*) idev;
-	pthread_mutex_unlock(&pdev->mutex_isoch);
+	if (!pdev)
+		return FALSE;
+
+	return ReleaseMutex(pdev->mutex_isoch);
 }
 
 static int libusb_udev_query_device_port_status(IUDEVICE* idev, UINT32* UsbdStatus, UINT32* BufferSize, BYTE* Buffer)
@@ -1567,14 +1600,17 @@ static int libusb_udev_bulk_or_interrupt_transfer(IUDEVICE* idev, UINT32 Request
 	return 0;
 }
 
-static void libusb_udev_cancel_all_transfer_request(IUDEVICE* idev)
+static BOOL libusb_udev_cancel_all_transfer_request(IUDEVICE* idev)
 {
 	int status;
 	UDEVICE* pdev = (UDEVICE*) idev;
 	REQUEST_QUEUE* request_queue = pdev->request_queue;
 	TRANSFER_REQUEST* request = NULL;
 
-	pthread_mutex_lock(&request_queue->request_loading);
+	if (!request_queue)
+		return FALSE;
+
+	WaitForSingleObject(request_queue->request_loading, INFINITE);
 			
 	request_queue->rewind(request_queue);
 
@@ -1602,7 +1638,7 @@ static void libusb_udev_cancel_all_transfer_request(IUDEVICE* idev)
 
 	}
 
-	pthread_mutex_unlock(&request_queue->request_loading);
+	return ReleaseMutex(request_queue->request_loading);
 }
 
 static int func_cancel_xact_request(TRANSFER_REQUEST *request)
@@ -1645,7 +1681,7 @@ static int libusb_udev_cancel_transfer_request(IUDEVICE* idev, UINT32 RequestId)
 	int status = 0, retry_times = 0;
 
 cancel_retry:
-	pthread_mutex_lock(&request_queue->request_loading);
+	WaitForSingleObject(request_queue->request_loading, INFINITE);
 
 	request_queue->rewind(request_queue);
 
@@ -1670,7 +1706,7 @@ cancel_retry:
 		}
 	}
 
-	pthread_mutex_unlock(&request_queue->request_loading);
+	ReleaseMutex(request_queue->request_loading);
 
 	if ((status == 0) && (retry_times < 10))
 	{
@@ -1702,6 +1738,28 @@ BASIC_STATE_FUNC_DEFINED(MsConfig, MSUSB_CONFIG_DESCRIPTOR *)
 BASIC_POINT_FUNC_DEFINED(udev, void *)
 BASIC_POINT_FUNC_DEFINED(prev, void *)
 BASIC_POINT_FUNC_DEFINED(next, void *)
+
+
+static void udev_free(IUDEVICE* idev)
+{
+	UDEVICE* dev = (UDEVICE*)idev;
+
+	/* release all interface and  attach kernel driver */
+	dev->iface.attach_kernel_driver((IUDEVICE*)dev);
+
+	if(dev->request_queue) zfree(dev->request_queue);
+	/* free the config descriptor that send from windows */
+	msusb_msconfig_free(dev->MsConfig);
+
+	libusb_close (dev->libusb_handle);
+	libusb_close (dev->hub_handle);
+
+	CloseHandle(dev->sem_id);
+	/* free device info */
+	free(dev->devDescriptor);
+	free(dev);
+}
+
 
 static void udev_load_interface(UDEVICE* pdev)
 {
@@ -1755,6 +1813,7 @@ static void udev_load_interface(UDEVICE* pdev)
 	pdev->iface.query_device_port_status = libusb_udev_query_device_port_status;
 	pdev->iface.request_queue_is_none = libusb_udev_request_queue_is_none;
 	pdev->iface.wait_for_detach = libusb_udev_wait_for_detach;
+	pdev->iface.free = udev_free;
 }
 
 static IUDEVICE* udev_init(UDEVICE* pdev, UINT16 bus_number, UINT16 dev_number)
@@ -1859,18 +1918,26 @@ static IUDEVICE* udev_init(UDEVICE* pdev, UINT16 bus_number, UINT16 dev_number)
 	pdev->channel_id = 0xffff;
 	pdev->request_queue = request_queue_new();
 	pdev->isoch_queue = NULL;
-	sem_init(&pdev->sem_id, 0, 0);
+	pdev->sem_id = CreateSemaphore(NULL, 0, (LONG)LONG_MAX, NULL);
+	if (!pdev->sem_id)
+		goto fail;
 
 	/* set config of windows */
 	pdev->MsConfig = msusb_msconfig_new();
+	if (!pdev->MsConfig)
+		goto fail;
 
-	pthread_mutex_init(&pdev->mutex_isoch, NULL);
-
-	//deb_config_msg(pdev->libusb_dev, config_temp, devDescriptor->bNumConfigurations);  
+	pdev->mutex_isoch = CreateMutex(NULL, FALSE, NULL);
+	if (!pdev->mutex_isoch)
+		goto fail;
 
 	udev_load_interface(pdev);
 
 	return (IUDEVICE*) pdev;
+
+fail:
+	udev_free((IUDEVICE*)pdev);
+	return NULL;
 }
 
 int udev_new_by_id(UINT16 idVendor, UINT16 idProduct, IUDEVICE*** devArray)
@@ -1885,9 +1952,11 @@ int udev_new_by_id(UINT16 idVendor, UINT16 idProduct, IUDEVICE*** devArray)
 
 	WLog_INFO(TAG, "VID: 0x%04X, PID: 0x%04X", idVendor, idProduct);
 
-	array = (UDEVICE**) malloc(16 * sizeof(UDEVICE*));
+	array = (UDEVICE**) calloc(16, sizeof(UDEVICE*));
+	if (!array)
+		return -1;
 
-	total_device = libusb_get_device_list(NULL, &libusb_list); 
+	total_device = libusb_get_device_list(NULL, &libusb_list);
 
 	for (i = 0; i < total_device; i++)
 	{
@@ -1918,7 +1987,7 @@ int udev_new_by_id(UINT16 idVendor, UINT16 idProduct, IUDEVICE*** devArray)
 			if (array[num] != NULL)
 				num++;
 		}
-		zfree(descriptor);
+		free(descriptor);
 	}
 
 	libusb_free_device_list(libusb_list, 1);

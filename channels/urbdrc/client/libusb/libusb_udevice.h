@@ -47,9 +47,9 @@ struct _UDEVICE
 {
 	IUDEVICE iface;
 
-	void * udev;
-	void * prev;
-	void * next;
+    struct _UDEVICE * udev;
+    struct _UDEVICE * prev;
+    struct _UDEVICE * next;
 
 	UINT32	UsbDevice; /* An unique interface ID */
 	UINT32	ReqCompletion; /* An unique interface ID */
@@ -72,14 +72,12 @@ struct _UDEVICE
 	/* Used in isochronous transfer */
 	void * isoch_queue;
 
-	pthread_mutex_t mutex_isoch;
-	sem_t   sem_id;
+    HANDLE mutex_isoch;
+    HANDLE   sem_id;
 };
 typedef UDEVICE * PUDEVICE;
 
 int udev_new_by_id(UINT16 idVendor, UINT16 idProduct, IUDEVICE ***devArray);
 IUDEVICE* udev_new_by_addr(int bus_number, int dev_number);
-
-extern int libusb_debug;
 
 #endif /* __LIBUSB_UDEVICE_H */

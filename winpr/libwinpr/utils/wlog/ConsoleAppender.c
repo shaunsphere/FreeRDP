@@ -147,7 +147,10 @@ int WLog_ConsoleAppender_WriteMessage(wLog* log, wLogConsoleAppender* appender, 
 	}
 
 	if (message->Level != WLOG_OFF)
+	{
 		fprintf(fp, "%s%s\n", message->PrefixString, message->TextString);
+		fflush(fp);
+	}
 #endif
 	return 1;
 }

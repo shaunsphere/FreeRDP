@@ -27,9 +27,9 @@ typedef struct _USB_SEARCHDEV USB_SEARCHDEV;
 
 struct _USB_SEARCHDEV
 {
-	void* inode;
-	void* prev;
-	void* next;
+    struct _USB_SEARCHDEV* inode;
+    struct _USB_SEARCHDEV* prev;
+    struct _USB_SEARCHDEV* next;
 	UINT16 idVendor;
 	UINT16 idProduct;
 };
@@ -44,22 +44,22 @@ struct _USB_SEARCHMAN
 	USB_SEARCHDEV*	head; /* head device in linked list */
 	USB_SEARCHDEV*	tail; /* tail device in linked list */
 
-	pthread_mutex_t mutex;
+    HANDLE mutex;
 	HANDLE term_event;
-	sem_t sem_term;
+    HANDLE sem_term;
 	int started;
 
 	/* for urbdrc channel call back */
 	void* urbdrc;
 
 	/* load service */
-	void (*rewind) (USB_SEARCHMAN* seachman);
+    BOOL (*rewind) (USB_SEARCHMAN* seachman);
 	/* show all device in the list */
-	void (*show) (USB_SEARCHMAN* self);
+    BOOL (*show) (USB_SEARCHMAN* self);
 	/* start searchman */
 	BOOL (*start) (USB_SEARCHMAN* self, void * func);
 	/* close searchman */
-	void (*close) (USB_SEARCHMAN* self);
+    BOOL (*close) (USB_SEARCHMAN* self);
 	/* add a new usb device for search */
 	BOOL (*add) (USB_SEARCHMAN* seachman, UINT16 idVendor, UINT16 idProduct);
 	/* remove a usb device from list */

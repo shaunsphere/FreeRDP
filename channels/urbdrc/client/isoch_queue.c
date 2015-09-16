@@ -24,9 +24,14 @@
 #include <unistd.h>
 #include "isoch_queue.h"
 
-static void isoch_queue_rewind(ISOCH_CALLBACK_QUEUE* queue)
+static BOOL isoch_queue_rewind(ISOCH_CALLBACK_QUEUE* queue)
 {
+	if (!queue)
+		return FALSE;
+
 	queue->curr = queue->head;
+
+	return TRUE;
 }
 
 static BOOL isoch_queue_has_next(ISOCH_CALLBACK_QUEUE* queue)
@@ -55,7 +60,7 @@ static ISOCH_CALLBACK_DATA* isoch_queue_register_data(ISOCH_CALLBACK_QUEUE* queu
 	isoch->device = dev;
 	isoch->callback = callback;
 	
-	pthread_mutex_lock(&queue->isoch_loading);
+	WaitForSingleObject(queue->isoch_loading, INFINITE);
 
 	if (queue->head == NULL)
 	{
@@ -72,7 +77,7 @@ static ISOCH_CALLBACK_DATA* isoch_queue_register_data(ISOCH_CALLBACK_QUEUE* queu
 	}
 	queue->isoch_num += 1;
 
-	pthread_mutex_unlock(&queue->isoch_loading);
+	ReleaseMutex(queue->isoch_loading);
 
 	return isoch;
 }
@@ -137,7 +142,7 @@ void isoch_queue_free(ISOCH_CALLBACK_QUEUE* queue)
 {
 	ISOCH_CALLBACK_DATA* isoch;
 
-	pthread_mutex_lock(&queue->isoch_loading);
+	WaitForSingleObject(queue->isoch_loading, INFINITE);
 
 	/** unregister all isochronous data*/
 	queue->rewind(queue);
@@ -150,9 +155,9 @@ void isoch_queue_free(ISOCH_CALLBACK_QUEUE* queue)
 			queue->unregister_data(queue, isoch);
 	}
 
-	pthread_mutex_unlock(&queue->isoch_loading);
+	ReleaseMutex(queue->isoch_loading);
 
-	pthread_mutex_destroy(&queue->isoch_loading);
+	CloseHandle(queue->isoch_loading);
 
 	/* free queue */
 	if (queue) 
@@ -167,8 +172,13 @@ ISOCH_CALLBACK_QUEUE* isoch_queue_new()
 	if (!queue)
 		return NULL;
 	
-	pthread_mutex_init(&queue->isoch_loading, NULL);
-	
+	queue->isoch_loading = CreateMutex(NULL, FALSE, NULL);
+	if (!queue->isoch_loading)
+	{
+		free(queue);
+		return NULL;
+	}
+
 	/* load service */
 	queue->get_next = isoch_queue_get_next;
 	queue->has_next = isoch_queue_has_next;
