@@ -1061,12 +1061,12 @@ public class SessionActivity extends ActionBarActivity implements
 	}
 
 	@Override
-	public boolean OnVerifiyCertificate(String subject, String issuer,
+	public int OnVerifiyCertificate(String subject, String issuer,
 			String fingerprint) {
 
 		// see if global settings says accept all
 		if (GlobalSettings.getAcceptAllCertificates())
-			return true;
+			return 2;
 
 		// this is where the return code of our dialog will be stored
 		callbackDialogResult = false;
@@ -1090,7 +1090,7 @@ public class SessionActivity extends ActionBarActivity implements
 		} catch (InterruptedException e) {
 		}
 
-		return callbackDialogResult;
+		return callbackDialogResult ? 1 : 0;
 	}
 
 	@Override

@@ -73,7 +73,7 @@ public class LibFreeRDP
 	{
 		void OnSettingsChanged(int width, int height, int bpp);
 		boolean OnAuthenticate(StringBuilder username, StringBuilder domain, StringBuilder password);
-		boolean OnVerifiyCertificate(String subject, String issuer, String fingerprint);
+		int OnVerifiyCertificate(String subject, String issuer, String fingerprint);
 		void OnGraphicsUpdate(int x, int y, int width, int height);		
 		void OnGraphicsResize(int width, int height, int bpp);		
 		void OnRemoteClipboardChanged(String data);
@@ -260,15 +260,15 @@ public class LibFreeRDP
 		return false;
 	}
 
-	private static boolean OnVerifyCertificate(int inst, String subject, String issuer, String fingerprint)
+	private static int OnVerifyCertificate(int inst, String subject, String issuer, String fingerprint)
 	{
 		SessionState s = GlobalApp.getSession(inst);
 		if (s == null)
-			return false;
+			return 0;
 		UIEventListener uiEventListener = s.getUIEventListener();
 		if (uiEventListener != null)
 			return uiEventListener.OnVerifiyCertificate(subject, issuer, fingerprint);
-		return false;
+		return 0;
 	}
 
 	private static void OnGraphicsUpdate(int inst, int x, int y, int width, int height)
