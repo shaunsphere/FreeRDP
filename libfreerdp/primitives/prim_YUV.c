@@ -27,6 +27,110 @@
 #include "prim_YUV.h"
 
 /**
+ * @brief general_YUV420CombineToYUV444
+ *	U444(2x,2y) = Um(2x,2y) * 4 - Ua(2x+1,2y) - Ua(2x,2y+1) - Ua(2x+1,2y+1)
+ *	V444(2x,2y) = Vm(2x,2y) * 4 - Va(2x+1,2y) - Va(2x,2y+1) - Va(2x+1,2y+1)
+ * @param pSrc    Pointer to auxilary YUV420 data
+ * @param srcStep Step width in auxilary YUV420 data
+ * @param pDst    Pointer to main YUV420 data
+ * @param dstStep Step width in main YUV420 data
+ * @param roi     Area information for YUV420 data
+ *
+ * @return PRIMITIVES_SUCCESS on success, an error code otherwise.
+ */
+static pstatus_t general_YUV420CombineToYUV444(
+		const BYTE* pMainSrc[3], const INT32 srcMainStep[3],
+		const BYTE* pAuxSrc[3], const INT32 srcAuxStep[3],
+		BYTE* pDst[3], const INT32 dstStep[3],
+		const prim_size_t* roi)
+{
+	UINT32 nWidth, nHeight;
+	UINT32 x, y;
+	UINT32 halfWidth, halfHeight;
+	const BYTE *Ua, *Va, *Ya;
+	const BYTE *Um, *Vm;
+	BYTE* pU;
+	BYTE* pV;
+
+	nWidth = roi->width & ~0x01;
+	nHeight = roi->height & ~0x01;
+	halfWidth = nWidth / 2;
+	halfHeight = nHeight / 2;
+
+	if (pMainSrc)
+	{
+		/* Y data is already here... */
+		/* B1 */
+		memcpy(pDst[0], pMainSrc[0], dstStep[0] * nWidth);
+
+		/* The first half of U, V are already here part of this frame. */
+		/* B2 and B3 */
+		for (y=0; y<halfHeight; y++)
+		{
+			Um = pMainSrc[1] + srcMainStep[1] * y;
+			Vm = pMainSrc[2] + srcMainStep[2] * y;
+			pU = pDst[1] + dstStep[1] * y * 2;
+			pV = pDst[1] + dstStep[2] * y * 2;
+			for (x=0; x<halfWidth; x++)
+			{
+				pU[2*x] = Um[x];
+				pV[2*x] = Vm[x];
+			}
+		}
+		if (!pAuxSrc)
+			return PRIMITIVES_SUCCESS;
+	} else if (!pAuxSrc)
+		return -1;
+
+	/* The second half of U and V is a bit more tricky... */
+	/* B4 */
+	for (y=0; y<halfHeight; y++)
+	{
+		Ya = pAuxSrc[0] + srcAuxStep[0] * y;
+		pU = pDst[1] + dstStep[1] * y * 2 + 1;
+
+		for (x=0; x<nWidth; x++)
+			pU[x] = Ya[x];
+	}
+
+	/* B5 */
+	for (y=halfHeight; y<nHeight; y++)
+	{
+		Ya = pAuxSrc[0] + srcAuxStep[0] * y;
+		pV = pDst[1] + dstStep[2] * (y - halfHeight) * 2 + 1;
+
+		for (x=0; x<nWidth; x++)
+			pV[x] = Ya[x];
+	}
+
+	/* B6 and B7 */
+	for (y=0; y<halfHeight; y++)
+	{
+		Ua = pAuxSrc[1] + srcAuxStep[1] * y;
+		Va = pAuxSrc[2] + srcAuxStep[2] * y;
+		pU = pDst[1] + dstStep[1] * y * 2;
+		pV = pDst[2] + dstStep[2] * y * 2;
+
+		for (x=0; x<halfWidth; x++)
+		{
+			pU[2*x+1] = Ua[x];
+			pV[2*x+1] = Va[x];
+		}
+	}
+
+	/* B7 */
+	for (y=0; y<halfHeight; y++)
+	{
+		Um = pAuxSrc[1] + srcAuxStep[1] * y;
+		pU = pDst[1] + dstStep[1] * y * 2;
+		for (x=0; x<halfWidth; x++)
+			pU[2*x+1] = Um[x];
+	}
+
+	return PRIMITIVES_SUCCESS;
+}
+
+/**
  * | R |    ( | 256     0    403 | |    Y    | )
  * | G | = (  | 256   -48   -120 | | U - 128 |  ) >> 8
  * | B |    ( | 256   475      0 | | V - 128 | )
@@ -36,33 +140,113 @@
  * | V |    ( | 128  -116    -12 | | B | )         | 128 |
  */
 
-pstatus_t general_YUV420ToRGB_8u_P3AC4R(const BYTE* pSrc[3], int srcStep[3],
-		BYTE* pDst, int dstStep, const prim_size_t* roi)
+static pstatus_t general_YUV444ToRGB_8u_P3AC4R(
+		const BYTE* pSrc[3], const INT32 srcStep[3],
+		BYTE* pDst, INT32 dstStep, const prim_size_t* roi)
 {
-	int x, y;
-	int dstPad;
-	int srcPad[3];
+	INT32 x, y;
 	BYTE Y, U, V;
-	int halfWidth;
-	int halfHeight;
+	INT32 R, G, B;
+	INT32 Yp, Up, Vp;
+	INT32 Up48, Up475;
+	INT32 Vp403, Vp120;
+	INT32 nWidth, nHeight;
+
+	nWidth = roi->width;
+	nHeight = roi->height;
+
+	for (y = 0; y < nHeight; y++)
+	{
+		const BYTE* pY = pSrc[0] + y * srcStep[0];
+		const BYTE* pU = pSrc[1] + y * srcStep[1];
+		const BYTE* pV = pSrc[2] + y * srcStep[2];
+		BYTE* pRGB = pDst + y * dstStep * 4;
+
+		for (x = 0; x < nWidth; x++)
+		{
+			Y = pY[x];
+			U = pU[x];
+			V = pV[x];
+
+			Up = U - 128;
+			Vp = V - 128;
+
+			Up48 = 48 * Up;
+			Up475 = 475 * Up;
+
+			Vp403 = Vp * 403;
+			Vp120 = Vp * 120;
+
+			/* 3rd pixel */
+			Yp = Y << 8;
+
+			R = (Yp + Vp403) >> 8;
+			G = (Yp - Up48 - Vp120) >> 8;
+			B = (Yp + Up475) >> 8;
+
+			if (R < 0)
+				R = 0;
+			else if (R > 255)
+				R = 255;
+
+			if (G < 0)
+				G = 0;
+			else if (G > 255)
+				G = 255;
+
+			if (B < 0)
+				B = 0;
+			else if (B > 255)
+				B = 255;
+
+			pRGB[0] = (BYTE) B;
+			pRGB[1] = (BYTE) G;
+			pRGB[2] = (BYTE) R;
+			pRGB[3] = 0xFF;
+		}
+	}
+
+	return PRIMITIVES_SUCCESS;
+}
+
+/**
+ * | R |    ( | 256     0    403 | |    Y    | )
+ * | G | = (  | 256   -48   -120 | | U - 128 |  ) >> 8
+ * | B |    ( | 256   475      0 | | V - 128 | )
+ *
+ * | Y |    ( |  54   183     18 | | R | )         |  0  |
+ * | U | = (  | -29   -99    128 | | G |  ) >> 8 + | 128 |
+ * | V |    ( | 128  -116    -12 | | B | )         | 128 |
+ */
+
+static pstatus_t general_YUV420ToRGB_8u_P3AC4R(
+		const BYTE* pSrc[3], const INT32 srcStep[3],
+		BYTE* pDst, INT32 dstStep, const prim_size_t* roi)
+{
+	INT32 x, y;
+	INT32 dstPad;
+	INT32 srcPad[3];
+	BYTE Y, U, V;
+	INT32 halfWidth;
+	INT32 halfHeight;
 	const BYTE* pY;
 	const BYTE* pU;
 	const BYTE* pV;
-	int R, G, B;
-	int Yp, Up, Vp;
-	int Up48, Up475;
-	int Vp403, Vp120;
+	INT32 R, G, B;
+	INT32 Yp, Up, Vp;
+	INT32 Up48, Up475;
+	INT32 Vp403, Vp120;
 	BYTE* pRGB = pDst;
-	int nWidth, nHeight;
-	int lastRow, lastCol;
+	INT32 nWidth, nHeight;
+	INT32 lastRow, lastCol;
 
 	pY = pSrc[0];
 	pU = pSrc[1];
 	pV = pSrc[2];
-	
+
 	lastCol = roi->width & 0x01;
 	lastRow = roi->height & 0x01;
-	
+
 	nWidth = (roi->width + 1) & ~0x0001;
 	nHeight = (roi->height + 1) & ~0x0001;
 
@@ -264,21 +448,22 @@ pstatus_t general_YUV420ToRGB_8u_P3AC4R(const BYTE* pSrc[3], int srcStep[3],
 	return PRIMITIVES_SUCCESS;
 }
 
-pstatus_t general_RGBToYUV420_8u_P3AC4R(const BYTE* pSrc, INT32 srcStep,
+static pstatus_t general_RGBToYUV420_8u_P3AC4R(
+		const BYTE* pSrc, INT32 srcStep,
 		BYTE* pDst[3], INT32 dstStep[3], const prim_size_t* roi)
 {
-	int x, y;
-	int dstPad[3];
-	int halfWidth;
-	int halfHeight;
+	INT32 x, y;
+	INT32 dstPad[3];
+	INT32 halfWidth;
+	INT32 halfHeight;
 	BYTE* pY;
 	BYTE* pU;
 	BYTE* pV;
-	int Y, U, V;
-	int R, G, B;
-	int Ra, Ga, Ba;
+	INT32 Y, U, V;
+	INT32 R, G, B;
+	INT32 Ra, Ga, Ba;
 	const BYTE* pRGB;
-	int nWidth, nHeight;
+	INT32 nWidth, nHeight;
 
 	pU = pDst[1];
 	pV = pDst[2];
@@ -369,7 +554,9 @@ void primitives_init_YUV(primitives_t* prims)
 {
 	prims->YUV420ToRGB_8u_P3AC4R = general_YUV420ToRGB_8u_P3AC4R;
 	prims->RGBToYUV420_8u_P3AC4R = general_RGBToYUV420_8u_P3AC4R;
-	
+	prims->YUV420CombineToYUV444 = general_YUV420CombineToYUV444;
+	prims->YUV444ToRGB_8u_P3AC4R = general_YUV444ToRGB_8u_P3AC4R;
+
 	primitives_init_YUV_opt(prims);
 }
 

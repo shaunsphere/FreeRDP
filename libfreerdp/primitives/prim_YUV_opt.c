@@ -22,12 +22,12 @@
 #include <emmintrin.h>
 #include <tmmintrin.h>
 
-pstatus_t ssse3_YUV420ToRGB_8u_P3AC4R(const BYTE **pSrc, int *srcStep,
-		BYTE *pDst, int dstStep, const prim_size_t *roi)
+pstatus_t ssse3_YUV420ToRGB_8u_P3AC4R(const BYTE **pSrc, const INT32 *srcStep,
+		BYTE *pDst, INT32 dstStep, const prim_size_t *roi)
 {
-	int lastRow, lastCol;
+	INT32 lastRow, lastCol;
 	BYTE *UData,*VData,*YData;
-	int i,nWidth,nHeight,VaddDst,VaddY,VaddU,VaddV;
+	INT32 i,nWidth,nHeight,VaddDst,VaddY,VaddU,VaddV;
 	__m128i r0,r1,r2,r3,r4,r5,r6,r7;
 	__m128i *buffer;
 	
