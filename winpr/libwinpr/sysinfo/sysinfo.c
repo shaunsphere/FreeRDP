@@ -174,7 +174,7 @@ void GetNativeSystemInfo(LPSYSTEM_INFO lpSystemInfo)
 	GetSystemInfo(lpSystemInfo);
 }
 
-BOOL GetComputerNameA(LPSTR lpBuffer, LPDWORD lpnSize)
+static BOOL GetComputerNameA(LPSTR lpBuffer, LPDWORD lpnSize)
 {
 	char* dot;
 	int length;
@@ -208,6 +208,9 @@ BOOL GetComputerNameExA(COMPUTER_NAME_FORMAT NameType, LPSTR lpBuffer, LPDWORD l
 {
 	int length;
 	char hostname[256];
+
+	if (!lpnSize)
+		return FALSE;
 
 	if ((NameType == ComputerNameNetBIOS) || (NameType == ComputerNamePhysicalNetBIOS))
 		return GetComputerNameA(lpBuffer, lpnSize);
@@ -245,10 +248,28 @@ BOOL GetComputerNameExA(COMPUTER_NAME_FORMAT NameType, LPSTR lpBuffer, LPDWORD l
 	return TRUE;
 }
 
-BOOL GetComputerNameExW(COMPUTER_NAME_FORMAT NameType, LPWSTR lpBuffer, LPDWORD nSize)
+BOOL GetComputerNameExW(COMPUTER_NAME_FORMAT NameType, LPWSTR lpBuffer, LPDWORD lpnSize)
 {
-	WLog_ERR(TAG, "GetComputerNameExW unimplemented");
-	return FALSE;
+	LPSTR tmp;
+	BOOL rc = FALSE;
+	if (!lpnSize)
+		return FALSE;
+
+	tmp = malloc(*lpnSize);
+	if (!tmp)
+		return FALSE;
+
+	if (!GetComputerNameExA(NameType, tmp, lpnSize))
+		goto out;
+
+	if (ConvertToUnicode(CP_UTF8, 0, tmp, -1, &lpBuffer, *lpnSize) == 0)
+		goto out;
+
+	rc = TRUE;
+
+out:
+	free (tmp);
+	return rc;
 }
 
 /* OSVERSIONINFOEX Structure:
