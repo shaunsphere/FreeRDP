@@ -34,6 +34,7 @@
 #define TAG WINPR_TAG("file")
 
 #include <winpr/wlog.h>
+#include <winpr/path.h>
 #include <winpr/string.h>
 
 #include "file.h"
@@ -734,7 +735,7 @@ BOOL SetStdHandleEx(DWORD dwStdHandle, HANDLE hNewHandle, HANDLE* phOldHandle)
 
 DWORD GetFileAttributesA(LPCSTR lpFileName)
 {
-	DWORD attributes = FILE_ATTRIBUTE_NORMAL;
+	DWORD attributes = 0;
 	int rc;
 	struct stat st;
 
@@ -743,7 +744,13 @@ DWORD GetFileAttributesA(LPCSTR lpFileName)
 		return FALSE;
 
 	if ((st.st_mode & (S_IWUSR | S_IWGRP | S_IWOTH)) == 0)
-		attributes = FILE_ATTRIBUTE_READONLY;
+		attributes |= FILE_ATTRIBUTE_READONLY;
+
+	if (PathIsDirectoryA(lpFileName))
+		attributes |= FILE_ATTRIBUTE_DIRECTORY;
+
+	if (attributes == 0)
+		attributes = FILE_ATTRIBUTE_NORMAL;
 
 	return attributes;
 }
