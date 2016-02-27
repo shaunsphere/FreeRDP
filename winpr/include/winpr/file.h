@@ -270,6 +270,14 @@ WINPR_API BOOL SetEndOfFile(HANDLE hFile);
 
 WINPR_API DWORD WINAPI GetFileSize(HANDLE hFile, LPDWORD lpFileSizeHigh);
 
+WINPR_API DWORD GetFileAttributesA(LPCSTR lpFileName);
+
+WINPR_API DWORD GetFileAttributesW(LPCWSTR lpFileName);
+
+WINPR_API BOOL SetFileAttributesA(LPCSTR lpFileName, DWORD dwFileAttributes);
+
+WINPR_API BOOL SetFileAttributesW(LPCWSTR lpFileName, DWORD dwFileAttributes);
+
 WINPR_API DWORD SetFilePointer(HANDLE hFile, LONG lDistanceToMove,
 		PLONG lpDistanceToMoveHigh, DWORD dwMoveMethod);
 
@@ -329,6 +337,8 @@ WINPR_API BOOL SetStdHandleEx(DWORD dwStdHandle, HANDLE hNewHandle, HANDLE* phOl
 #define FindNextFile		FindNextFileW
 #define CreateDirectory		CreateDirectoryW
 #define RemoveDirectory		RemoveDirectoryW
+#define GetFileAttributes   GetFileAttributesW
+#define SetFileAttributes   SetFileAttributesW
 #else
 #define CreateFile		CreateFileA
 #define DeleteFile		DeleteFileA
@@ -337,6 +347,8 @@ WINPR_API BOOL SetStdHandleEx(DWORD dwStdHandle, HANDLE hNewHandle, HANDLE* phOl
 #define FindNextFile		FindNextFileA
 #define CreateDirectory		CreateDirectoryA
 #define RemoveDirectory		RemoveDirectoryA
+#define GetFileAttributes   GetFileAttributesA
+#define SetFileAttributes   SetFileAttributesA
 #endif
 
 /* Extra Functions */

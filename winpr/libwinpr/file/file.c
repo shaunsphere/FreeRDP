@@ -732,6 +732,72 @@ BOOL SetStdHandleEx(DWORD dwStdHandle, HANDLE hNewHandle, HANDLE* phOldHandle)
 	return FALSE;
 }
 
+DWORD GetFileAttributesA(LPCSTR lpFileName)
+{
+	DWORD attributes = FILE_ATTRIBUTE_NORMAL;
+	int rc;
+	struct stat st;
+
+	rc = stat(lpFileName, &st);
+	if (rc < 0)
+		return FALSE;
+
+	if ((st.st_mode & (S_IWUSR | S_IWGRP | S_IWOTH)) == 0)
+		attributes = FILE_ATTRIBUTE_READONLY;
+
+	return attributes;
+}
+
+DWORD GetFileAttributesW(LPCWSTR lpFileName)
+{
+	DWORD rc;
+	LPSTR tmp = NULL;
+
+	if (ConvertFromUnicode(CP_UTF8, 0, lpFileName, -1, &tmp, 0, NULL, NULL) == 0)
+		return 0;
+
+	rc = GetFileAttributesA(tmp);
+	free (tmp);
+
+	return rc;
+}
+
+BOOL SetFileAttributesA(LPCSTR lpFileName, DWORD dwFileAttributes)
+{
+	int rc;
+	struct stat st;
+
+	rc = stat(lpFileName, &st);
+	if (rc < 0)
+		return FALSE;
+
+	if (dwFileAttributes & FILE_ATTRIBUTE_READONLY)
+	{
+		st.st_mode = st.st_mode & ~(S_IWUSR | S_IWGRP | S_IWOTH);
+
+		rc = chmod(lpFileName, st.st_mode);
+
+		if (rc < 0)
+			return FALSE;
+	}
+
+	return TRUE;
+}
+
+BOOL SetFileAttributesW(LPCWSTR lpFileName, DWORD dwFileAttributes)
+{
+	BOOL rc;
+	LPSTR tmp = NULL;
+
+	if (ConvertFromUnicode(CP_UTF8, 0, lpFileName, -1, &tmp, 0, NULL, NULL) == 0)
+		return 0;
+
+	rc = SetFileAttributesA(tmp, dwFileAttributes);
+	free (tmp);
+
+	return rc;
+}
+
 #endif /* _WIN32 */
 
 /* Extended API */
