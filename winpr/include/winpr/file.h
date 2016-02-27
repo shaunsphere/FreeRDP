@@ -288,6 +288,9 @@ WINPR_API BOOL UnlockFile(HANDLE hFile, DWORD dwFileOffsetLow, DWORD dwFileOffse
 WINPR_API BOOL UnlockFileEx(HANDLE hFile, DWORD dwReserved, DWORD nNumberOfBytesToUnlockLow,
 		DWORD nNumberOfBytesToUnlockHigh, LPOVERLAPPED lpOverlapped);
 
+WINPR_API BOOL GetFileTime(HANDLE hFile, FILETIME *lpCreationTime,
+		FILETIME *lpLastAccessTime, FILETIME *lpLastWriteTime);
+
 WINPR_API BOOL SetFileTime(HANDLE hFile, const FILETIME *lpCreationTime,
 		const FILETIME *lpLastAccessTime, const FILETIME *lpLastWriteTime);
 

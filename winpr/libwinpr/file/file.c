@@ -348,6 +348,51 @@ static BOOL FileUnlockFileEx(HANDLE hFile, DWORD dwReserved, DWORD nNumberOfByte
 	return TRUE;
 }
 
+static BOOL FileGetFileTime(HANDLE hFile, FILETIME *lpCreationTime,
+		FILETIME *lpLastAccessTime, FILETIME *lpLastWriteTime)
+{
+	int rc;
+	ULARGE_INTEGER atime, mtime;
+	struct stat st;
+	WINPR_FILE* pFile = (WINPR_FILE*)hFile;
+	const UINT64 EPOCH_DIFF = 11644473600ULL;
+
+	if (!hFile)
+		return FALSE;
+
+	rc = fstat(fileno(pFile->fp), &st);
+	if (rc < 0)
+		return FALSE;
+
+	atime.QuadPart = EPOCH_DIFF + st.st_atime * 10000000ULL;
+	mtime.QuadPart = EPOCH_DIFF + st.st_mtime * 10000000ULL;
+
+#ifdef __APPLE__
+#if !defined(_POSIX_C_SOURCE) || defined(_DARWIN_C_SOURCE)
+	atime.QuadPart += st.st_atimespec.tv_nsec / 100ULL;
+	mtime.QuadPart += st.st_mtimespec.tv_nsec / 100ULL;
+#else
+	atime.QuadPart += st.st_atimensec / 100ULL;
+	mtime.QuadPart += st.st_mtimensec / 100ULL;
+#endif
+#elif ANDROID
+	atime.QuadPart += st.st_atime_nsec / 100ULL;
+	mtime.QuadPart += st.st_mtime_nsec / 100ULL;
+#elif __linux__
+	atime.QuadPart += st.st_atim.tv_nsec / 100ULL;
+	mtime.QuadPart += st.st_mtim.tv_nsec / 100ULL;
+#endif
+	
+	lpLastAccessTime->dwHighDateTime = atime.HighPart;
+	lpLastAccessTime->dwLowDateTime = atime.LowPart;
+	lpLastWriteTime->dwHighDateTime = mtime.HighPart;
+	lpLastWriteTime->dwLowDateTime = mtime.LowPart;
+	lpCreationTime->dwHighDateTime = mtime.HighPart;
+	lpCreationTime->dwLowDateTime = mtime.LowPart;
+
+	return TRUE;
+}
+
 static BOOL FileSetFileTime(HANDLE hFile, const FILETIME *lpCreationTime,
 		const FILETIME *lpLastAccessTime, const FILETIME *lpLastWriteTime)
 {
@@ -381,8 +426,8 @@ static BOOL FileSetFileTime(HANDLE hFile, const FILETIME *lpCreationTime,
 		times[0].tv_nsec = buf.st_atimensec;
 #endif
 #elif ANDROID
-		timevals[0].tv_sec = buf.st_mtime;
-		timevals[0].tv_usec = buf.st_mtimensec / 1000UL;
+		timevals[0].tv_sec = buf.st_atime;
+		timevals[0].tv_usec = buf.st_atimensec / 1000UL;
 #else
 		times[0].tv_sec = UTIME_OMIT;
 		times[0].tv_nsec = UTIME_OMIT;
@@ -475,6 +520,7 @@ static HANDLE_OPS fileOps = {
 	FileLockFileEx,
 	FileUnlockFile,
 	FileUnlockFileEx,
+	FileGetFileTime,
 	FileSetFileTime
 };
 
@@ -498,6 +544,7 @@ static HANDLE_OPS shmOps = {
 	NULL, /* FileLockFileEx */
 	NULL, /* FileUnlockFile */
 	NULL, /* FileUnlockFileEx */
+	NULL, /* FileGetFileTime */
 	NULL  /* FileSetFileTime */
 };
 
