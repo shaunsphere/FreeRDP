@@ -36,6 +36,8 @@
 
 #if defined(WIN32)
 #include <Shlobj.h>
+#else
+#include <dirent.h>
 #endif
 
 static char* GetPath_XDG_CONFIG_HOME(void);
@@ -493,6 +495,49 @@ BOOL PathFileExistsA(LPCSTR pszPath)
 
 BOOL PathFileExistsW(LPCWSTR pszPath)
 {
-	return FALSE;
+	BOOL rc;
+	LPSTR tmp = NULL;
+
+	if (ConvertFromUnicode(CP_UTF8, 0, pszPath, -1, &tmp, 0, NULL, NULL) == 0)
+		return FALSE;
+
+	rc = PathFileExistsA(tmp);
+	free(tmp);
+
+	return rc;
 }
 
+BOOL PathIsDirectoryEmptyA(LPCSTR pszPath)
+{
+	struct dirent *dp;
+	BOOL empty = TRUE;
+
+	DIR *dir = opendir(pszPath);
+	if (dir == NULL)
+		return TRUE;
+
+	while ((dp = readdir(dir)) != NULL) {
+		if (strcmp(dp->d_name, ".") == 0 || strcmp(dp->d_name, "..") == 0)
+			continue;    /* Skip . and .. */
+
+		empty = FALSE;
+		break;
+	}
+	closedir(dir);
+	return empty;
+}
+
+BOOL PathIsDirectoryEmptyW(LPCWSTR pszPath)
+{
+	BOOL rc;
+	LPSTR tmp = NULL;
+
+	if (ConvertFromUnicode(CP_UTF8, 0, pszPath, -1, &tmp, 0, NULL, NULL) == 0)
+		return FALSE;
+
+	rc = PathIsDirectoryEmptyA(tmp);
+	free(tmp);
+
+	return rc;
+
+}
