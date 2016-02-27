@@ -290,6 +290,9 @@ WINPR_API BOOL PathMakePathA(LPCSTR path, LPSECURITY_ATTRIBUTES lpAttributes);
 WINPR_API BOOL PathFileExistsA(LPCSTR pszPath);
 WINPR_API BOOL PathFileExistsW(LPCWSTR pszPath);
 
+WINPR_API BOOL PathIsDirectoryA(LPCSTR pszPath);
+WINPR_API BOOL PathIsDirectoryW(LPCWSTR pszPath);
+
 WINPR_API BOOL PathIsDirectoryEmptyA(LPCSTR pszPath);
 WINPR_API BOOL PathIsDirectoryEmptyW(LPCWSTR pszPath);
 
@@ -299,9 +302,11 @@ WINPR_API BOOL PathIsDirectoryEmptyW(LPCWSTR pszPath);
 
 #ifdef UNICODE
 #define PathFileExists	PathFileExistsW
+#define PathIsDirectory PathIsDirectoryW
 #define PathIsDirectoryEmpty PathIsDirectoryEmptyW
 #else
 #define PathFileExists	PathFileExistsA
+#define PathIsDirectory PathIsDirectoryA
 #define PathIsDirectoryEmpty PathIsDirectoryEmptyA
 #endif
 

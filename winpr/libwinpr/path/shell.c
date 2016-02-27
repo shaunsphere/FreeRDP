@@ -507,6 +507,31 @@ BOOL PathFileExistsW(LPCWSTR pszPath)
 	return rc;
 }
 
+BOOL PathIsDirectoryA(LPCSTR pszPath)
+{
+	struct stat st;
+
+	if (stat(pszPath, &st) < 0)
+		return FALSE;
+
+	return (S_ISDIR(st.st_mode));
+}
+
+BOOL PathIsDirectoryW(LPCWSTR pszPath)
+{
+	BOOL rc;
+	LPSTR tmp = NULL;
+
+	if (ConvertFromUnicode(CP_UTF8, 0, pszPath, -1, &tmp, 0, NULL, NULL) == 0)
+		return FALSE;
+
+	rc = PathIsDirectoryA(tmp);
+	free(tmp);
+
+	return rc;
+
+}
+
 BOOL PathIsDirectoryEmptyA(LPCSTR pszPath)
 {
 	struct dirent *dp;
