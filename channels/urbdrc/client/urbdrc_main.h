@@ -96,8 +96,7 @@ struct _TRANSFER_DATA
 	URBDRC_CHANNEL_CALLBACK* callback;
 	URBDRC_PLUGIN* urbdrc;
 	IUDEVMAN* udevman;
-	BYTE* pBuffer;
-	UINT32 cbSize;
+	wStream* pBuffer;
 	UINT32 UsbDevice;
 };
 
@@ -111,7 +110,7 @@ struct _IUDEVICE
 
 	int (*control_transfer) (IUDEVICE* idev, UINT32 RequestId,
 							 UINT32 EndpointAddress, UINT32 TransferFlags, BYTE bmRequestType, BYTE Request, UINT16 Value,
-							 UINT16 Index, UINT32* UrbdStatus, UINT32* BufferSize, BYTE* Buffer, UINT32 Timeout);
+							 UINT16 Index, UINT32* UrbdStatus, wStream* data, UINT32 Timeout);
 
 	int (*bulk_or_interrupt_transfer) (IUDEVICE* idev, UINT32 RequestId, UINT32 EndpointAddress,
 									   UINT32 TransferFlags, UINT32* UsbdStatus, UINT32* BufferSize, BYTE* Buffer, UINT32 Timeout);
@@ -156,8 +155,7 @@ struct _IUDEVICE
 	void (*unlock_fifo_isoch) (IUDEVICE* idev);
 
 	int (*query_device_port_status) (IUDEVICE* idev, UINT32 *UsbdStatus,
-									 UINT32* BufferSize,
-									 BYTE* Buffer);
+									 wStream* Buffer);
 
 	int (*request_queue_is_none) (IUDEVICE* idev);
 

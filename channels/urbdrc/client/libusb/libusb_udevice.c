@@ -171,12 +171,16 @@ already_done:
 static void func_iso_callback(struct libusb_transfer *transfer)
 {
 	ISO_USER_DATA* iso_user_data = (ISO_USER_DATA*) transfer->user_data;
-	BYTE* data = iso_user_data->IsoPacket;
+	wStream* data;
 	int* completed = &iso_user_data->completed;
 	UINT32 offset = 0;
 	UINT32 index = 0;
 	UINT32 i, act_len;
 	BYTE* b;
+
+	data = Stream_New(iso_user_data->IsoPacket, iso_user_data );
+	if (!data)
+		return;
 
 	*completed = 1;
 	/* Fixme: currently fill the dummy frame number, tt needs to be
@@ -187,9 +191,9 @@ static void func_iso_callback(struct libusb_transfer *transfer)
 		for (i = 0; i < transfer->num_iso_packets; i++)
 		{
 			act_len = transfer->iso_packet_desc[i].actual_length;
-			data_write_UINT32(data + offset, index);
-			data_write_UINT32(data + offset + 4, act_len);
-			data_write_UINT32(data + offset + 8,
+			Stream_Write_UINT32(data, index);
+			Stream_Write_UINT32(data, act_len);
+			Stream_Write_UINT32(data,
 							  transfer->iso_packet_desc[i].status);
 			offset += 12;
 
@@ -1050,7 +1054,7 @@ static int libusb_udev_os_feature_descriptor_request(IUDEVICE* idev, UINT32 Requ
 	if (error > 0)
 	{
 		BYTE bMS_Vendorcode;
-		data_read_BYTE(ms_string_desc + 16, bMS_Vendorcode);
+		ms_string_desc[0x10] = bMS_Vendorcode;
 		//WLog_ERR(TAG,  "bMS_Vendorcode:0x%x", bMS_Vendorcode);
 		/** get os descriptor */
 		error = libusb_control_transfer(pdev->libusb_handle,
@@ -1272,12 +1276,11 @@ static void  libusb_udev_unlock_fifo_isoch(IUDEVICE* idev)
 	ReleaseMutex(&pdev->mutex_isoch);
 }
 
-static int libusb_udev_query_device_port_status(IUDEVICE* idev, UINT32* UsbdStatus, UINT32* BufferSize, BYTE* Buffer)
+static int libusb_udev_query_device_port_status(IUDEVICE* idev, UINT32* UsbdStatus, wStream* data)
 {
 	UDEVICE* pdev = (UDEVICE*) idev;
 	int success = 0, ret;
 
-	WLog_DBG(TAG,"...");
 	if (pdev->hub_handle != NULL)
 	{
 		ret = idev->control_transfer(idev, 0xffff, 0, 0,
@@ -1285,19 +1288,13 @@ static int libusb_udev_query_device_port_status(IUDEVICE* idev, UINT32* UsbdStat
 									 | LIBUSB_REQUEST_TYPE_CLASS
 									 | LIBUSB_RECIPIENT_OTHER,
 									 LIBUSB_REQUEST_GET_STATUS,
-									 0, pdev->port_number, UsbdStatus, BufferSize, Buffer, 1000);
+									 0, pdev->port_number, UsbdStatus,
+									 data, 1000);
 
 		if (ret < 0)
-		{
 			WLog_DBG(TAG,"libusb_control_transfer: error num %d", ret);
-			*BufferSize = 0;
-		}
 		else
-		{
-			WLog_DBG(TAG,"PORT STATUS:0x%02x%02x%02x%02x",
-					 Buffer[3], Buffer[2], Buffer[1], Buffer[0]);
 			success = 1;
-		}
 	}
 
 	return success;
