@@ -47,9 +47,9 @@ static void msusb_mspipes_free(MSUSB_PIPE_DESCRIPTOR** MsPipes, UINT32 NumberOfP
 	{
 		for (pnum = 0; pnum < NumberOfPipes && MsPipes[pnum]; pnum++)
 		{
-				zfree(MsPipes[pnum]);
+				free(MsPipes[pnum]);
 		}
-		zfree(MsPipes);
+		free(MsPipes);
 	}
 }
 
@@ -115,7 +115,7 @@ static void msusb_msinterface_free(MSUSB_INTERFACE_DESCRIPTOR* MsInterface)
 	{
 		msusb_mspipes_free(MsInterface->MsPipes, MsInterface->NumberOfPipes);
 		MsInterface->MsPipes = NULL;
-		zfree(MsInterface);
+		free(MsInterface);
 	}
 }
 
@@ -130,7 +130,7 @@ static void msusb_msinterface_free_list(MSUSB_INTERFACE_DESCRIPTOR** MsInterface
 			msusb_msinterface_free(MsInterfaces[inum]);
 		}
 
-		zfree(MsInterfaces);
+		free(MsInterfaces);
 	}
 }
 
@@ -284,7 +284,7 @@ void msusb_msconfig_free(MSUSB_CONFIG_DESCRIPTOR* MsConfig)
 	{
 		msusb_msinterface_free_list(MsConfig->MsInterfaces, MsConfig->NumInterfaces);
 		MsConfig->MsInterfaces = NULL;
-		zfree(MsConfig);
+		free(MsConfig);
 	}
 }
 
