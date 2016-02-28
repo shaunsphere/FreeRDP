@@ -25,6 +25,9 @@
 #include "config.h"
 #endif
 
+#include <winpr/stream.h>
+#include <winpr/synch.h>
+
 #include <freerdp/dvc.h>
 #include <freerdp/types.h>
 #include <freerdp/channels/log.h>
@@ -35,10 +38,7 @@
 #else
 #include <uuid/uuid.h>
 #endif
-#include <pthread.h>
 #include <semaphore.h>
-
-#include <winpr/stream.h>
 
 #define TAG CHANNELS_TAG("urbdrc.client")
 #ifdef WITH_DEBUG_DVC
