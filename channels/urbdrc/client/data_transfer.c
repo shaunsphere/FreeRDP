@@ -704,7 +704,6 @@ static int urb_control_transfer(URBDRC_CHANNEL_CALLBACK* callback, wStream* data
 	}
 
 	/** send data */
-	offset = 36;
 	if (transferDir == USBD_TRANSFER_DIRECTION_IN)
 		out_size = offset + OutputBufferSize;
 	else
@@ -2387,9 +2386,11 @@ void* urbdrc_process_udev_data_transfer(void* arg)
 	else
 	{
 		udevman->push_urb(udevman);
-		return error;
+		ExitThread(error);
+		return NULL;
 	}
 
 	udevman->push_urb(udevman);
-	return error;
+	ExitThread(error);
+	return NULL;
 }
