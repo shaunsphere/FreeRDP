@@ -643,9 +643,9 @@ static int urb_control_transfer(URBDRC_CHANNEL_CALLBACK* callback, wStream* data
 		return 0;
 
 	InterfaceId = ((STREAM_ID_PROXY << 30) | pdev->get_ReqCompletion(pdev));
-	Stream_Read_UINT32(data + 0, RequestId);
-	Stream_Read_UINT32(data + 4, PipeHandle);
-	Stream_Read_UINT32(data + 8, TransferFlags); /** TransferFlags */
+	Stream_Read_UINT32(data, RequestId);
+	Stream_Read_UINT32(data, PipeHandle);
+	Stream_Read_UINT32(data, TransferFlags); /** TransferFlags */
 
 	EndpointAddress = (PipeHandle & 0x000000ff);
 	Timeout = 2000;
@@ -687,6 +687,8 @@ static int urb_control_transfer(URBDRC_CHANNEL_CALLBACK* callback, wStream* data
 	if (transferDir == USBD_TRANSFER_DIRECTION_OUT)
 		Stream_Copy(out_data, data, OutputBufferSize);
 
+	Stream_SetPosition(out_data, 36);
+
 	/**  process URB_FUNCTION_CONTROL_TRANSFER */
 	ret = pdev->control_transfer(
 				pdev, RequestId, EndpointAddress, TransferFlags,
@@ -705,33 +707,36 @@ static int urb_control_transfer(URBDRC_CHANNEL_CALLBACK* callback, wStream* data
 
 	/** send data */
 	if (transferDir == USBD_TRANSFER_DIRECTION_IN)
-		out_size = offset + OutputBufferSize;
+		out_size = Stream_GetPosition(out_data) + OutputBufferSize;
 	else
-		out_size = offset;
+		out_size = Stream_GetPosition(out_data);
 
-	Stream_Write_UINT32(out_data + 0, InterfaceId);	/** interface */
-	Stream_Write_UINT32(out_data + 4, MessageId);		/** message id */
+	Stream_SetPosition(out_data, 0);
+	Stream_Write_UINT32(out_data, InterfaceId);	/** interface */
+	Stream_Write_UINT32(out_data, MessageId);		/** message id */
 
 	if(transferDir == USBD_TRANSFER_DIRECTION_IN && OutputBufferSize != 0)
-		Stream_Write_UINT32(out_data + 8, URB_COMPLETION);	/** function id */
+		Stream_Write_UINT32(out_data, URB_COMPLETION);	/** function id */
 	else
-		Stream_Write_UINT32(out_data + 8, URB_COMPLETION_NO_DATA);
-	Stream_Write_UINT32(out_data + 12, RequestId);	/** RequestId */
-	Stream_Write_UINT32(out_data + 16, 0x00000008); 	/** CbTsUrbResult */
+		Stream_Write_UINT32(out_data, URB_COMPLETION_NO_DATA);
+	Stream_Write_UINT32(out_data, RequestId);	/** RequestId */
+	Stream_Write_UINT32(out_data, 0x00000008); 	/** CbTsUrbResult */
 	/** TsUrbResult TS_URB_RESULT_HEADER */
-	Stream_Write_UINT16(out_data + 20, 0x0008);	/** Size */
+	Stream_Write_UINT16(out_data, 0x0008);	/** Size */
 
 	/** Padding, MUST be ignored upon receipt */
-	Stream_Write_UINT16(out_data + 22, URB_FUNCTION_CONTROL_TRANSFER);
-	Stream_Write_UINT32(out_data + 24, usbd_status);	/** UsbdStatus */
+	Stream_Write_UINT16(out_data, URB_FUNCTION_CONTROL_TRANSFER);
+	Stream_Write_UINT32(out_data, usbd_status);	/** UsbdStatus */
 
-	Stream_Write_UINT32(out_data + 28, 0);	/** HResult */
-	Stream_Write_UINT32(out_data + 32, OutputBufferSize);	/** OutputBufferSize */
+	Stream_Write_UINT32(out_data, 0);	/** HResult */
+	Stream_Write_UINT32(out_data, OutputBufferSize);	/** OutputBufferSize */
+	Stream_SealLength(out_data);
 
 	if (!pdev->isSigToEnd(pdev))
-		callback->channel->Write(callback->channel, out_size, out_data, NULL);
+		callback->channel->Write(callback->channel, out_size,
+								 Stream_Buffer(out_data), NULL);
 
-	free(out_data);
+	Stream_Free(out_data, TRUE);
 
 	return 0;
 }
