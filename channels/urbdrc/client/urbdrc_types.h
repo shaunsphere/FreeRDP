@@ -38,7 +38,6 @@
 #else
 #include <uuid/uuid.h>
 #endif
-#include <semaphore.h>
 
 #define TAG CHANNELS_TAG("urbdrc.client")
 #ifdef WITH_DEBUG_DVC
