@@ -26,32 +26,33 @@
 #include <libudev.h>
 #endif
 
+#include <winpr/stream.h>
 #include <winpr/sysinfo.h>
 
 #include "libusb_udevice.h"
 
 #define BASIC_STATE_FUNC_DEFINED(_arg, _type) \
 	static _type udev_get_##_arg (IUDEVICE* idev) \
-	{ \
-		UDEVICE* pdev = (UDEVICE*) idev; \
-		return pdev->_arg; \
-		} \
-		static void udev_set_##_arg (IUDEVICE* idev, _type _t) \
-	{ \
-		UDEVICE* pdev = (UDEVICE*) idev; \
-		pdev->_arg = _t; \
+{ \
+	UDEVICE* pdev = (UDEVICE*) idev; \
+	return pdev->_arg; \
+	} \
+	static void udev_set_##_arg (IUDEVICE* idev, _type _t) \
+{ \
+	UDEVICE* pdev = (UDEVICE*) idev; \
+	pdev->_arg = _t; \
 	}
 
 #define BASIC_POINT_FUNC_DEFINED(_arg, _type) \
 	static _type udev_get_p_##_arg (IUDEVICE* idev) \
-	{ \
-		UDEVICE* pdev = (UDEVICE*) idev; \
-		return pdev->_arg; \
-		} \
-		static void udev_set_p_##_arg (IUDEVICE* idev, _type _t) \
-	{ \
-		UDEVICE* pdev = (UDEVICE*) idev; \
-		pdev->_arg = _t; \
+{ \
+	UDEVICE* pdev = (UDEVICE*) idev; \
+	return pdev->_arg; \
+	} \
+	static void udev_set_p_##_arg (IUDEVICE* idev, _type _t) \
+{ \
+	UDEVICE* pdev = (UDEVICE*) idev; \
+	pdev->_arg = _t; \
 	}
 
 #define BASIC_STATE_FUNC_REGISTER(_arg, _dev) \
@@ -63,13 +64,13 @@ typedef struct _ISO_USER_DATA ISO_USER_DATA;
 
 struct _ISO_USER_DATA
 {
-	BYTE* IsoPacket;
-	BYTE* output_data;
-	int iso_status;
-	int completed;
-	UINT32 error_count;
-	int noack;
-	UINT32 start_frame;
+		BYTE* IsoPacket;
+		BYTE* output_data;
+		int iso_status;
+		int completed;
+		UINT32 error_count;
+		int noack;
+		UINT32 start_frame;
 };
 
 static int get_next_timeout(libusb_context *ctx, struct timeval *tv, struct timeval *out)
@@ -98,7 +99,7 @@ static int get_next_timeout(libusb_context *ctx, struct timeval *tv, struct time
 	return 0;
 }
 
-/* 
+/*
  * a simple wrapper to implement libusb_handle_events_timeout_completed
  * function in libusb library git tree (1.0.9 later) */
 static int handle_events_completed(libusb_context *ctx, int *completed)
@@ -178,7 +179,7 @@ static void func_iso_callback(struct libusb_transfer *transfer)
 	UINT32 i, act_len;
 	BYTE* b;
 
-	data = Stream_New(iso_user_data->IsoPacket, iso_user_data );
+	data = Stream_New(iso_user_data->IsoPacket, iso_user_data);
 	if (!data)
 		return;
 
@@ -194,7 +195,7 @@ static void func_iso_callback(struct libusb_transfer *transfer)
 			Stream_Write_UINT32(data, index);
 			Stream_Write_UINT32(data, act_len);
 			Stream_Write_UINT32(data,
-							  transfer->iso_packet_desc[i].status);
+					    transfer->iso_packet_desc[i].status);
 			offset += 12;
 
 			if (transfer->iso_packet_desc[i].status == USBD_STATUS_SUCCESS)
@@ -236,7 +237,7 @@ static void func_iso_callback(struct libusb_transfer *transfer)
 }
 
 static const LIBUSB_ENDPOINT_DESCEIPTOR* func_get_ep_desc(LIBUSB_CONFIG_DESCRIPTOR* LibusbConfig,
-														  MSUSB_CONFIG_DESCRIPTOR* MsConfig, UINT32 EndpointAddress)
+							  MSUSB_CONFIG_DESCRIPTOR* MsConfig, UINT32 EndpointAddress)
 {
 	BYTE alt;
 	int inum, pnum;
@@ -251,7 +252,7 @@ static const LIBUSB_ENDPOINT_DESCEIPTOR* func_get_ep_desc(LIBUSB_CONFIG_DESCRIPT
 	{
 		alt = MsInterfaces[inum]->AlternateSetting;
 		endpoint = interface[inum].altsetting[alt].endpoint;
-		
+
 		for (pnum = 0; pnum < MsInterfaces[inum]->NumberOfPipes; pnum++)
 		{
 			if (endpoint[pnum].bEndpointAddress == EndpointAddress)
@@ -349,7 +350,7 @@ static int func_set_usbd_status(UDEVICE* pdev, UINT32* status, int err_result)
 }
 
 static void func_iso_data_init(ISO_USER_DATA* iso_user_data, UINT32 numPacket, UINT32 buffsize,
-							   UINT32 noAck, BYTE* isoPacket, BYTE * buffer)
+			       UINT32 noAck, BYTE* isoPacket, BYTE * buffer)
 {
 	/* init struct iso_user_data */
 	iso_user_data->IsoPacket = isoPacket;
@@ -471,7 +472,7 @@ static LIBUSB_DEVICE* udev_get_libusb_dev(int bus_number, int dev_number)
 	for (i = 0; i < total_device; i++)
 	{
 		if ((bus_number == libusb_get_bus_number(libusb_list[i])) &&
-				(dev_number == libusb_get_device_address(libusb_list[i])))
+		    (dev_number == libusb_get_device_address(libusb_list[i])))
 			return libusb_list[i];
 	}
 
@@ -513,7 +514,7 @@ static int udev_get_hub_handle(UDEVICE* pdev, UINT16 bus_number, UINT16 dev_numb
 	for (i = 0; i < total_device; i ++)
 	{
 		if ((bus_number != libusb_get_bus_number(libusb_list[i])) ||
-				(dev_number != libusb_get_device_address(libusb_list[i])))
+		    (dev_number != libusb_get_device_address(libusb_list[i])))
 			continue;
 		error = libusb_open(libusb_list[i], &pdev->hub_handle);
 		if (error < 0)
@@ -544,7 +545,7 @@ static int udev_get_hub_handle(UDEVICE* pdev, UINT16 bus_number, UINT16 dev_numb
 		for (i = 0; i < total_device; i ++)
 		{
 			if ((bus_number != libusb_get_bus_number(libusb_list[i])) ||
-					(1 != libusb_get_device_address(libusb_list[i]))) /* Root hub allways first on bus. */
+			    (1 != libusb_get_device_address(libusb_list[i]))) /* Root hub allways first on bus. */
 				continue;
 			WLog_DBG(TAG, "  Open hub: %d", bus_number);
 			error = libusb_open(libusb_list[i], &pdev->hub_handle);
@@ -592,7 +593,7 @@ static int udev_get_hub_handle(UDEVICE* pdev, UINT16 bus_number, UINT16 dev_numb
 	udev_list_entry_foreach(dev_list_entry, devices)
 	{
 		const char * path;
-		
+
 		path = udev_list_entry_get_name(dev_list_entry);
 		dev = udev_device_new_from_syspath(udev, path);
 
@@ -617,7 +618,7 @@ static int udev_get_hub_handle(UDEVICE* pdev, UINT16 bus_number, UINT16 dev_numb
 				p1 = strchr(p2, '.');
 			}
 			while (p1 != NULL);
-			
+
 			if ((p2 - sysfs_path) < (strlen(sysfs_path) - 2))
 			{
 				p1 = (char*) sysfs_path;
@@ -647,7 +648,7 @@ static int udev_get_hub_handle(UDEVICE* pdev, UINT16 bus_number, UINT16 dev_numb
 			memset(pdev->path, 0, 17);
 			strcpy(pdev->path, p2);
 			WLog_DBG(TAG,"  DevPath: %s", pdev->path);
-			
+
 			/* query parent hub info */
 			dev = udev_device_get_parent(dev);
 
@@ -720,12 +721,12 @@ static int libusb_udev_select_interface(IUDEVICE* idev, BYTE InterfaceNumber, BY
 	if (diff)
 	{
 		error = libusb_set_interface_alt_setting(pdev->libusb_handle,
-												 InterfaceNumber, AlternateSetting);
+							 InterfaceNumber, AlternateSetting);
 
 		if (error < 0)
 		{
 			WLog_ERR(TAG,  "Set interface altsetting get error num %d",
-					 error);
+				 error);
 		}
 	}
 
@@ -752,8 +753,8 @@ static MSUSB_CONFIG_DESCRIPTOR* libusb_udev_complete_msconfig_setup(IUDEVICE* id
 	if (LibusbConfig->bNumInterfaces != MsConfig->NumInterfaces)
 	{
 		WLog_ERR(TAG,  "Select Configuration: Libusb NumberInterfaces(%d) is different "
-					   "with MsConfig NumberInterfaces(%d)",
-				 LibusbConfig->bNumInterfaces, MsConfig->NumInterfaces);
+			       "with MsConfig NumberInterfaces(%d)",
+			 LibusbConfig->bNumInterfaces, MsConfig->NumInterfaces);
 	}
 
 	/* replace MsPipes for libusb */
@@ -785,7 +786,7 @@ static MSUSB_CONFIG_DESCRIPTOR* libusb_udev_complete_msconfig_setup(IUDEVICE* id
 				t_MsPipe->MaximumTransferSize = 0xffffffff;
 				t_MsPipe->PipeFlags = 0;
 			}
-			
+
 			t_MsPipe->PipeHandle = 0;
 			t_MsPipe->bEndpointAddress = 0;
 			t_MsPipe->bInterval = 0;
@@ -806,8 +807,8 @@ static MSUSB_CONFIG_DESCRIPTOR* libusb_udev_complete_msconfig_setup(IUDEVICE* id
 	   * ---------------------------------------------------------------
 	 * ***********************/
 	MsConfig->ConfigurationHandle = MsConfig->bConfigurationValue |
-			(pdev->bus_number << 24) |
-			(pdev->dev_number << 16);
+					(pdev->bus_number << 24) |
+					(pdev->dev_number << 16);
 
 	MsInterfaces = MsConfig->MsInterfaces;
 	for (inum = 0; inum < MsConfig->NumInterfaces; inum++)
@@ -824,9 +825,9 @@ static MSUSB_CONFIG_DESCRIPTOR* libusb_udev_complete_msconfig_setup(IUDEVICE* id
 		 * ---------------------------------------------------------------
 		 * ***********************/
 		MsInterface->InterfaceHandle = LibusbAltsetting->bInterfaceNumber
-				| (LibusbAltsetting->bAlternateSetting << 8)
-				| (pdev->dev_number << 16)
-				| (pdev->bus_number << 24);
+					       | (LibusbAltsetting->bAlternateSetting << 8)
+					       | (pdev->dev_number << 16)
+					       | (pdev->bus_number << 24);
 
 		MsInterface->Length = 16 + (MsInterface->NumberOfPipes * 20);
 		MsInterface->bInterfaceClass = LibusbAltsetting->bInterfaceClass;
@@ -849,8 +850,8 @@ static MSUSB_CONFIG_DESCRIPTOR* libusb_udev_complete_msconfig_setup(IUDEVICE* id
 			 * ---------------------------------------------------------------
 			 * ***********************/
 			MsPipe->PipeHandle = LibusbEndpoint->bEndpointAddress
-					| (pdev->dev_number << 16)
-					| (pdev->bus_number << 24);
+					     | (pdev->dev_number << 16)
+					     | (pdev->bus_number << 24);
 			/* count endpoint max packet size */
 			int max = LibusbEndpoint->wMaxPacketSize & 0x07ff;
 			BYTE attr = LibusbEndpoint->bmAttributes;
@@ -917,7 +918,7 @@ static int libusb_udev_select_configuration(IUDEVICE* idev, UINT32 bConfiguratio
 }
 
 static int libusb_udev_control_pipe_request(IUDEVICE* idev, UINT32 RequestId,
-											UINT32 EndpointAddress, UINT32* UsbdStatus, int command)
+					    UINT32 EndpointAddress, UINT32* UsbdStatus, int command)
 {
 	int error = 0;
 	UDEVICE* pdev = (UDEVICE*) idev;
@@ -932,13 +933,13 @@ static int libusb_udev_control_pipe_request(IUDEVICE* idev, UINT32 RequestId,
 		//dummy_wait_s_obj(1);
 		/** set feature to ep (set halt)*/
 		error = libusb_control_transfer(pdev->libusb_handle,
-										LIBUSB_ENDPOINT_OUT | LIBUSB_RECIPIENT_ENDPOINT,
-										LIBUSB_REQUEST_SET_FEATURE,
-										ENDPOINT_HALT,
-										EndpointAddress,
-										NULL,
-										0,
-										1000);
+						LIBUSB_ENDPOINT_OUT | LIBUSB_RECIPIENT_ENDPOINT,
+						LIBUSB_REQUEST_SET_FEATURE,
+						ENDPOINT_HALT,
+						EndpointAddress,
+						NULL,
+						0,
+						1000);
 		break;
 	case PIPE_RESET:
 		idev->cancel_all_transfer_request(idev);
@@ -961,9 +962,9 @@ static int libusb_udev_control_pipe_request(IUDEVICE* idev, UINT32 RequestId,
 }
 
 static int libusb_udev_control_query_device_text(IUDEVICE* idev, UINT32 TextType,
-												 UINT32 LocaleId,
-												 UINT32 * BufferSize,
-												 BYTE * Buffer)
+						 UINT32 LocaleId,
+						 UINT32 * BufferSize,
+						 BYTE * Buffer)
 {
 	UDEVICE* pdev = (UDEVICE*) idev;
 	LIBUSB_DEVICE_DESCRIPTOR * devDescriptor = pdev->devDescriptor;
@@ -976,10 +977,10 @@ static int libusb_udev_control_query_device_text(IUDEVICE* idev, UINT32 TextType
 	switch (TextType){
 	case DeviceTextDescription:
 		ret = libusb_get_string_descriptor (pdev->libusb_handle,
-											devDescriptor->iProduct,
-											LocaleId,
-											Buffer,
-											*BufferSize);
+						    devDescriptor->iProduct,
+						    LocaleId,
+						    Buffer,
+						    *BufferSize);
 
 		for(i = 0; i < ret; i++)
 		{
@@ -989,7 +990,7 @@ static int libusb_udev_control_query_device_text(IUDEVICE* idev, UINT32 TextType
 
 		if (ret <= 0 || ret < 4){
 			WLog_DBG(TAG,"libusb_get_string_descriptor: "
-						 "ERROR num %d, iProduct: %d!", ret, devDescriptor->iProduct);
+				     "ERROR num %d, iProduct: %d!", ret, devDescriptor->iProduct);
 			memcpy(Buffer, strDesc, strlen(strDesc));
 			Buffer[strlen(strDesc)] = '\0';
 			*BufferSize = (strlen((char *)Buffer)) * 2;
@@ -1026,14 +1027,14 @@ static int libusb_udev_control_query_device_text(IUDEVICE* idev, UINT32 TextType
 
 
 static int libusb_udev_os_feature_descriptor_request(IUDEVICE* idev, UINT32 RequestId,
-													 BYTE Recipient,
-													 BYTE InterfaceNumber,
-													 BYTE Ms_PageIndex,
-													 UINT16 Ms_featureDescIndex,
-													 UINT32 * UsbdStatus,
-													 UINT32 * BufferSize,
-													 BYTE* Buffer,
-													 int Timeout)
+						     BYTE Recipient,
+						     BYTE InterfaceNumber,
+						     BYTE Ms_PageIndex,
+						     UINT16 Ms_featureDescIndex,
+						     UINT32 * UsbdStatus,
+						     UINT32 * BufferSize,
+						     BYTE* Buffer,
+						     int Timeout)
 {
 	UDEVICE* pdev = (UDEVICE*) idev;
 	BYTE ms_string_desc[0x13];
@@ -1043,13 +1044,13 @@ static int libusb_udev_os_feature_descriptor_request(IUDEVICE* idev, UINT32 Requ
 	*/
 	memset(ms_string_desc, 0, 0x13);
 	error = libusb_control_transfer(pdev->libusb_handle,
-									LIBUSB_ENDPOINT_IN | Recipient,
-									LIBUSB_REQUEST_GET_DESCRIPTOR,
-									0x03ee,
-									0,
-									ms_string_desc,
-									0x12,
-									Timeout);
+					LIBUSB_ENDPOINT_IN | Recipient,
+					LIBUSB_REQUEST_GET_DESCRIPTOR,
+					0x03ee,
+					0,
+					ms_string_desc,
+					0x12,
+					Timeout);
 	//WLog_ERR(TAG,  "Get ms string: result number %d", error);
 	if (error > 0)
 	{
@@ -1058,13 +1059,13 @@ static int libusb_udev_os_feature_descriptor_request(IUDEVICE* idev, UINT32 Requ
 		//WLog_ERR(TAG,  "bMS_Vendorcode:0x%x", bMS_Vendorcode);
 		/** get os descriptor */
 		error = libusb_control_transfer(pdev->libusb_handle,
-										LIBUSB_ENDPOINT_IN |LIBUSB_REQUEST_TYPE_VENDOR | Recipient,
-										bMS_Vendorcode,
-										(InterfaceNumber << 8) | Ms_PageIndex,
-										Ms_featureDescIndex,
-										Buffer,
-										*BufferSize,
-										Timeout);
+						LIBUSB_ENDPOINT_IN |LIBUSB_REQUEST_TYPE_VENDOR | Recipient,
+						bMS_Vendorcode,
+						(InterfaceNumber << 8) | Ms_PageIndex,
+						Ms_featureDescIndex,
+						Buffer,
+						*BufferSize,
+						Timeout);
 		*BufferSize = error;
 	}
 
@@ -1135,7 +1136,7 @@ static void libusb_udev_detach_kernel_driver(IUDEVICE* idev)
 				WLog_DBG(TAG,"libusb_detach_kernel_driver = %d", err);
 			}
 		}
-		
+
 		pdev->status |= URBDRC_DEVICE_DETACH_KERNEL;
 	}
 }
@@ -1284,12 +1285,12 @@ static int libusb_udev_query_device_port_status(IUDEVICE* idev, UINT32* UsbdStat
 	if (pdev->hub_handle != NULL)
 	{
 		ret = idev->control_transfer(idev, 0xffff, 0, 0,
-									 LIBUSB_ENDPOINT_IN
-									 | LIBUSB_REQUEST_TYPE_CLASS
-									 | LIBUSB_RECIPIENT_OTHER,
-									 LIBUSB_REQUEST_GET_STATUS,
-									 0, pdev->port_number, UsbdStatus,
-									 data, 1000);
+					     LIBUSB_ENDPOINT_IN
+					     | LIBUSB_REQUEST_TYPE_CLASS
+					     | LIBUSB_RECIPIENT_OTHER,
+					     LIBUSB_REQUEST_GET_STATUS,
+					     0, pdev->port_number, UsbdStatus,
+					     data, 1000);
 
 		if (ret < 0)
 			WLog_DBG(TAG,"libusb_control_transfer: error num %d", ret);
@@ -1311,9 +1312,9 @@ static int libusb_udev_request_queue_is_none(IUDEVICE* idev)
 }
 
 static int libusb_udev_isoch_transfer(IUDEVICE* idev, UINT32 RequestId, UINT32 EndpointAddress,
-									  UINT32 TransferFlags, int NoAck, UINT32* ErrorCount,
-									  UINT32* UrbdStatus, UINT32* StartFrame, UINT32 NumberOfPackets,
-									  BYTE* IsoPacket, UINT32* BufferSize, BYTE* Buffer, int Timeout)
+				      UINT32 TransferFlags, int NoAck, UINT32* ErrorCount,
+				      UINT32* UrbdStatus, UINT32* StartFrame, UINT32 NumberOfPackets,
+				      BYTE* IsoPacket, UINT32* BufferSize, BYTE* Buffer, int Timeout)
 {
 	UINT32 iso_packet_size;
 	UDEVICE* pdev = (UDEVICE*) idev;
@@ -1336,8 +1337,8 @@ static int libusb_udev_isoch_transfer(IUDEVICE* idev, UINT32 RequestId, UINT32 E
 
 	/** fill setting */
 	libusb_fill_iso_transfer(iso_transfer,
-							 pdev->libusb_handle, EndpointAddress, Buffer, *BufferSize,
-							 NumberOfPackets, func_iso_callback, &iso_user_data, 2000);
+				 pdev->libusb_handle, EndpointAddress, Buffer, *BufferSize,
+				 NumberOfPackets, func_iso_callback, &iso_user_data, 2000);
 
 	libusb_set_iso_packet_lengths(iso_transfer, iso_packet_size);
 
@@ -1396,18 +1397,24 @@ static int libusb_udev_isoch_transfer(IUDEVICE* idev, UINT32 RequestId, UINT32 E
 	return status;
 }
 
-static int libusb_udev_control_transfer(IUDEVICE* idev, UINT32 RequestId, UINT32 EndpointAddress,
-										UINT32 TransferFlags, BYTE bmRequestType, BYTE Request, UINT16 Value, UINT16 Index,
-										UINT32* UrbdStatus, UINT32* BufferSize, BYTE* Buffer, UINT32 Timeout)
+static int libusb_udev_control_transfer(IUDEVICE* idev, UINT32 RequestId,
+					UINT32 EndpointAddress,
+					UINT32 TransferFlags, BYTE bmRequestType,
+					BYTE Request, UINT16 Value, UINT16 Index,
+					UINT32* UrbdStatus, wStream* Buffer,
+					UINT32 Timeout)
 {
 	int status = 0;
 	UDEVICE* pdev = (UDEVICE*) idev;
 
 	status = libusb_control_transfer(pdev->libusb_handle,
-									 bmRequestType, Request, Value, Index, Buffer, *BufferSize, Timeout);
+					 bmRequestType, Request, Value, Index,
+					 Stream_Pointer(Buffer),
+					 Stream_GetRemainingLength(Buffer),
+					 Timeout);
 
 	if (!(status < 0))
-		*BufferSize = status;
+		Stream_SetPosition(Buffer, status);
 
 	func_set_usbd_status(pdev, UrbdStatus, status);
 
@@ -1415,7 +1422,10 @@ static int libusb_udev_control_transfer(IUDEVICE* idev, UINT32 RequestId, UINT32
 }
 
 static int libusb_udev_bulk_or_interrupt_transfer(IUDEVICE* idev, UINT32 RequestId,
-												  UINT32 EndpointAddress, UINT32 TransferFlags, UINT32* UsbdStatus, UINT32* BufferSize, BYTE* Buffer, UINT32 Timeout)
+						  UINT32 EndpointAddress,
+						  UINT32 TransferFlags,
+						  UINT32* UsbdStatus,
+						  wStream* Buffer, UINT32 Timeout)
 {
 	UINT32 transfer_type;
 	UDEVICE* pdev = (UDEVICE*) idev;
@@ -1428,18 +1438,21 @@ static int libusb_udev_bulk_or_interrupt_transfer(IUDEVICE* idev, UINT32 Request
 	/* alloc memory for urb transfer */
 	transfer = libusb_alloc_transfer(0);
 
-	ep_desc = func_get_ep_desc(pdev->LibusbConfig, pdev->MsConfig, EndpointAddress);
+	ep_desc = func_get_ep_desc(pdev->LibusbConfig, pdev->MsConfig,
+				   EndpointAddress);
 
 	if (!ep_desc)
 	{
-		WLog_ERR(TAG,  "func_get_ep_desc: endpoint 0x%x is not found!!", EndpointAddress);
+		WLog_ERR(TAG,  "func_get_ep_desc: endpoint 0x%x is not found!!",
+			 EndpointAddress);
 		return -1;
 	}
 	transfer_type = (ep_desc->bmAttributes) & 0x3;
 
 	WLog_DBG(TAG,"urb_bulk_or_interrupt_transfer: ep:0x%x "
-				 "transfer_type %d flag:%d OutputBufferSize:0x%x",
-			 EndpointAddress, transfer_type, TransferFlags, *BufferSize);
+		     "transfer_type %d flag:%d OutputBufferSize:0x%x",
+		 EndpointAddress, transfer_type, TransferFlags,
+		 Stream_GetRemainingLength(Buffer));
 
 	switch (transfer_type)
 	{
@@ -1453,27 +1466,29 @@ static int libusb_udev_bulk_or_interrupt_transfer(IUDEVICE* idev, UINT32 Request
 		/** Sometime, we may have receive a oversized transfer request,
 			 * it make submit urb return error, so we set the length of
 			 * request to wMaxPacketSize */
-		if (*BufferSize != (ep_desc->wMaxPacketSize))
+		if (Stream_GetRemainingLength(Buffer) != (ep_desc->wMaxPacketSize))
 		{
 			WLog_DBG(TAG,"Interrupt Transfer(%s): "
-						 "BufferSize is different than maxPacketsize(0x%x)",
-					 ((transferDir)?"IN":"OUT"), ep_desc->wMaxPacketSize);
-			if((*BufferSize) > (ep_desc->wMaxPacketSize) &&
-					transferDir == USBD_TRANSFER_DIRECTION_IN)
-				(*BufferSize) = ep_desc->wMaxPacketSize;
+				     "BufferSize is different than maxPacketsize(0x%x)",
+				 ((transferDir)?"IN":"OUT"), ep_desc->wMaxPacketSize);
+			if(Stream_GetRemainingLength(Buffer) > (ep_desc->wMaxPacketSize) &&
+			   transferDir == USBD_TRANSFER_DIRECTION_IN)
+				Stream_SetPosition(Buffer, ep_desc->wMaxPacketSize);
 		}
 		Timeout = 0;
 		break;
 
 	default:
 		WLog_DBG(TAG,"urb_bulk_or_interrupt_transfer:"
-					 " other transfer type 0x%X", transfer_type);
+			     " other transfer type 0x%X", transfer_type);
 		return -1;
 		break;
 	}
 
 	libusb_fill_bulk_transfer(transfer, pdev->libusb_handle, EndpointAddress,
-							  Buffer, *BufferSize, func_bulk_transfer_cb, &completed, Timeout);
+				  Stream_Pointer(Buffer),
+				  Stream_GetRemainingLength(Buffer),
+				  func_bulk_transfer_cb, &completed, Timeout);
 
 	transfer->type = (unsigned char) transfer_type;
 
@@ -1484,17 +1499,17 @@ static int libusb_udev_bulk_or_interrupt_transfer(IUDEVICE* idev, UINT32 Request
 	{
 		WLog_DBG(TAG,"libusb_bulk_transfer: error num %d", status);
 		func_set_usbd_status(pdev, UsbdStatus, status);
-		*BufferSize = 0;
+		Stream_SetPosition(Buffer, 0);
 	}
 	else
 	{
 		request = pdev->request_queue->register_request(
-					pdev->request_queue, RequestId, transfer, EndpointAddress);
+				  pdev->request_queue, RequestId, transfer, EndpointAddress);
 		request->submit = 1;
 	}
 
 	if ((pdev && *UsbdStatus == 0) && (submit >= 0) &&
-			(pdev->iface.isSigToEnd((IUDEVICE*) pdev) == 0))
+	    (pdev->iface.isSigToEnd((IUDEVICE*) pdev) == 0))
 	{
 		while (!completed)
 		{
@@ -1550,10 +1565,11 @@ static int libusb_udev_bulk_or_interrupt_transfer(IUDEVICE* idev, UINT32 Request
 			func_set_usbd_status(pdev, UsbdStatus, LIBUSB_ERROR_OTHER);
 			break;
 		}
-		
-		*BufferSize = transfer->actual_length;
+
+		Stream_SetPosition(Buffer, transfer->actual_length);
 	}
-	WLog_DBG(TAG,"bulk or interrupt Transfer data size : 0x%x", *BufferSize);
+	WLog_DBG(TAG,"bulk or interrupt Transfer data size : 0x%x",
+		 Stream_GetPosition(Buffer));
 
 	if (request)
 	{
@@ -1580,10 +1596,10 @@ static void libusb_udev_cancel_all_transfer_request(IUDEVICE* idev)
 	while (request_queue->has_next(request_queue))
 	{
 		request = request_queue->get_next(request_queue);
-		
+
 		if ((!request) || (!request->transfer) ||
-				(request->endpoint != request->transfer->endpoint) ||
-				(request->transfer->endpoint == 0) || (request->submit != 1))
+		    (request->endpoint != request->transfer->endpoint) ||
+		    (request->transfer->endpoint == 0) || (request->submit != 1))
 		{
 			continue;
 		}
@@ -1612,7 +1628,7 @@ static int func_cancel_xact_request(TRANSFER_REQUEST *request)
 		return -1;
 
 	if ((!request->transfer) || (request->endpoint != request->transfer->endpoint) ||
-			(request->transfer->endpoint == 0) || (request->submit != 1))
+	    (request->transfer->endpoint == 0) || (request->submit != 1))
 	{
 		return 0;
 	}
@@ -1655,7 +1671,7 @@ cancel_retry:
 			continue;
 
 		WLog_DBG(TAG,"CancelId:0x%x RequestId:0x%x endpoint 0x%x!!",
-				 RequestId, request->RequestId, request->endpoint);
+			 RequestId, request->RequestId, request->endpoint);
 
 		if ((request && request->RequestId) == (RequestId && retry_times <= 10))
 		{
@@ -1797,10 +1813,10 @@ static IUDEVICE* udev_init(UDEVICE* pdev, UINT16 bus_number, UINT16 dev_number)
 	interface_temp = config_temp->interface[0].altsetting[0];
 
 	WLog_DBG(TAG,"Regist Device: Vid: 0x%04X Pid: 0x%04X"
-				 " InterfaceClass = 0x%X",
-			 pdev->devDescriptor->idVendor,
-			 pdev->devDescriptor->idProduct,
-			 interface_temp.bInterfaceClass);
+		     " InterfaceClass = 0x%X",
+		 pdev->devDescriptor->idVendor,
+		 pdev->devDescriptor->idProduct,
+		 interface_temp.bInterfaceClass);
 
 	/* Denied list */
 	switch(interface_temp.bInterfaceClass)
@@ -1827,14 +1843,14 @@ static IUDEVICE* udev_init(UDEVICE* pdev, UINT16 bus_number, UINT16 dev_number)
 	devDescriptor = pdev->devDescriptor;
 
 	if ((devDescriptor->bNumConfigurations == 1) &&
-			(config_temp->bNumInterfaces > 1) &&
-			(devDescriptor->bDeviceClass == 0x0))
+	    (config_temp->bNumInterfaces > 1) &&
+	    (devDescriptor->bDeviceClass == 0x0))
 	{
 		pdev->isCompositeDevice = 1;
 	}
 	else if ((devDescriptor->bDeviceClass == 0xef) &&
-			 (devDescriptor->bDeviceSubClass == 0x02) &&
-			 (devDescriptor->bDeviceProtocol == 0x01))
+		 (devDescriptor->bDeviceSubClass == 0x02) &&
+		 (devDescriptor->bDeviceProtocol == 0x01))
 	{
 		pdev->isCompositeDevice = 1;
 	}
