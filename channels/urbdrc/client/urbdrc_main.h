@@ -112,8 +112,9 @@ struct _IUDEVICE
 							 UINT32 EndpointAddress, UINT32 TransferFlags, BYTE bmRequestType, BYTE Request, UINT16 Value,
 							 UINT16 Index, UINT32* UrbdStatus, wStream* data, UINT32 Timeout);
 
-	int (*bulk_or_interrupt_transfer) (IUDEVICE* idev, UINT32 RequestId, UINT32 EndpointAddress,
-									   UINT32 TransferFlags, UINT32* UsbdStatus, UINT32* BufferSize, BYTE* Buffer, UINT32 Timeout);
+	int (*bulk_or_interrupt_transfer) (IUDEVICE* idev, UINT32 RequestId,
+									   UINT32 EndpointAddress, UINT32 TransferFlags,
+									   UINT32* UsbdStatus, wStream* data, UINT32 Timeout);
 
 	int (*select_configuration) (IUDEVICE* idev, UINT32 bConfigurationValue);
 

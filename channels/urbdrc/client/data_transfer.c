@@ -745,12 +745,14 @@ static int urb_bulk_or_interrupt_transfer(URBDRC_CHANNEL_CALLBACK* callback,
 										  wStream* data, UINT32 MessageId,
 										  IUDEVMAN* udevman, UINT32 UsbDevice, int transferDir)
 {
-	int offset;
-	BYTE* Buffer;
 	IUDEVICE* pdev;
-	BYTE* out_data;
+	wStream* tmp;
+	wStream* out_data;
 	UINT32 out_size, RequestId, InterfaceId, EndpointAddress, PipeHandle;
 	UINT32 TransferFlags, OutputBufferSize, usbd_status = 0;
+
+	if (Stream_GetRemainingLength(data) < 16)
+		return -1;
 
 	pdev = udevman->get_udevice_by_UsbDevice(udevman, UsbDevice);
 
@@ -759,11 +761,11 @@ static int urb_bulk_or_interrupt_transfer(URBDRC_CHANNEL_CALLBACK* callback,
 
 	InterfaceId = ((STREAM_ID_PROXY << 30) | pdev->get_ReqCompletion(pdev));
 
-	Stream_Read_UINT32(data + 0, RequestId);
-	Stream_Read_UINT32(data + 4, PipeHandle);
-	Stream_Read_UINT32(data + 8, TransferFlags);	/** TransferFlags */
-	Stream_Read_UINT32(data + 12, OutputBufferSize);
-	offset = 16;
+	Stream_Read_UINT32(data, RequestId);
+	Stream_Read_UINT32(data, PipeHandle);
+	Stream_Read_UINT32(data, TransferFlags);	/** TransferFlags */
+	Stream_Read_UINT32(data, OutputBufferSize);
+
 	EndpointAddress = (PipeHandle & 0x000000ff);
 
 	if (transferDir == USBD_TRANSFER_DIRECTION_OUT)
@@ -771,18 +773,19 @@ static int urb_bulk_or_interrupt_transfer(URBDRC_CHANNEL_CALLBACK* callback,
 	else
 		out_size = 36 + OutputBufferSize;
 
-	Buffer = NULL;
-	out_data = (BYTE*) malloc(out_size);
-	memset(out_data, 0, out_size);
+	out_data = Stream_New(NULL, out_size);
+	if (!out_data)
+		return -1;
 
+	Stream_Seek(out_data, 36);
 	switch (transferDir)
 	{
 	case USBD_TRANSFER_DIRECTION_OUT:
-		Buffer = data + offset;
+		tmp = data;
 		break;
 
 	case USBD_TRANSFER_DIRECTION_IN:
-		Buffer = out_data + 36;
+		tmp = out_data;
 		break;
 	}
 
@@ -791,36 +794,34 @@ static int urb_bulk_or_interrupt_transfer(URBDRC_CHANNEL_CALLBACK* callback,
 				pdev, RequestId, EndpointAddress,
 				TransferFlags,
 				&usbd_status,
-				&OutputBufferSize,
-				Buffer,
+				tmp,
 				10000);
 
-	offset = 36;
-	if (transferDir == USBD_TRANSFER_DIRECTION_IN)
-		out_size = offset + OutputBufferSize;
-	else
-		out_size = offset;
+	out_size = Stream_GetPosition(out_data);
+
 	/** send data */
-	Stream_Write_UINT32(out_data + 0, InterfaceId);	/** interface */
-	Stream_Write_UINT32(out_data + 4, MessageId);	/** message id */
+	Stream_SetPosition(out_data, 0);
+	Stream_Write_UINT32(out_data, InterfaceId);	/** interface */
+	Stream_Write_UINT32(out_data, MessageId);	/** message id */
 	if(transferDir == USBD_TRANSFER_DIRECTION_IN && OutputBufferSize != 0)
-		Stream_Write_UINT32(out_data + 8, URB_COMPLETION);	/** function id */
+		Stream_Write_UINT32(out_data, URB_COMPLETION);	/** function id */
 	else
-		Stream_Write_UINT32(out_data + 8, URB_COMPLETION_NO_DATA);
-	Stream_Write_UINT32(out_data + 12, RequestId);	/** RequestId */
-	Stream_Write_UINT32(out_data + 16, 0x00000008);	/** CbTsUrbResult */
+		Stream_Write_UINT32(out_data, URB_COMPLETION_NO_DATA);
+	Stream_Write_UINT32(out_data, RequestId);	/** RequestId */
+	Stream_Write_UINT32(out_data, 0x00000008);	/** CbTsUrbResult */
 	/** TsUrbResult TS_URB_RESULT_HEADER */
-	Stream_Write_UINT16(out_data + 20, 0x0008);	/** Size */
+	Stream_Write_UINT16(out_data, 0x0008);	/** Size */
 
 	/** Padding, MUST be ignored upon receipt */
-	Stream_Write_UINT16(out_data + 22, URB_FUNCTION_BULK_OR_INTERRUPT_TRANSFER);
-	Stream_Write_UINT32(out_data + 24, usbd_status);	/** UsbdStatus */
+	Stream_Write_UINT16(out_data, URB_FUNCTION_BULK_OR_INTERRUPT_TRANSFER);
+	Stream_Write_UINT32(out_data, usbd_status);	/** UsbdStatus */
 
-	Stream_Write_UINT32(out_data + 28, 0);	/** HResult */
-	Stream_Write_UINT32(out_data + 32, OutputBufferSize);	/** OutputBufferSize */
+	Stream_Write_UINT32(out_data, 0);	/** HResult */
+	Stream_Write_UINT32(out_data, OutputBufferSize);	/** OutputBufferSize */
 
 	if (pdev && !pdev->isSigToEnd(pdev))
-		callback->channel->Write(callback->channel, out_size, out_data, NULL);
+		callback->channel->Write(callback->channel, out_size,
+								 Stream_Buffer(out_data), NULL);
 
 	free(out_data);
 
