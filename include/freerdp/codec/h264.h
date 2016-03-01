@@ -64,10 +64,11 @@ struct _H264_CONTEXT
 	UINT32 QP;
 	UINT32 NumberOfThreads;
 
-	INT32 iStride[2][3];
+	UINT32 iStride[2][3];
 	BYTE* pYUVData[2][3];
 
-	INT32 iYUV444Stride[3];
+	UINT32 iYUV444Size[3];
+	UINT32 iYUV444Stride[3];
 	BYTE* pYUV444Data[3];
 
 	void* pSystemData;

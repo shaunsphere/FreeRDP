@@ -39,9 +39,9 @@
  * @return PRIMITIVES_SUCCESS on success, an error code otherwise.
  */
 static pstatus_t general_YUV420CombineToYUV444(
-		const BYTE* pMainSrc[3], const INT32 srcMainStep[3],
-		const BYTE* pAuxSrc[3], const INT32 srcAuxStep[3],
-		BYTE* pDst[3], const INT32 dstStep[3],
+		const BYTE* pMainSrc[3], const UINT32 srcMainStep[3],
+		const BYTE* pAuxSrc[3], const UINT32 srcAuxStep[3],
+		BYTE* pDst[3], const UINT32 dstStep[3],
 		const prim_size_t* roi)
 {
 	UINT32 nWidth, nHeight;
@@ -61,7 +61,8 @@ static pstatus_t general_YUV420CombineToYUV444(
 	{
 		/* Y data is already here... */
 		/* B1 */
-		memcpy(pDst[0], pMainSrc[0], dstStep[0] * nWidth);
+		size_t size = dstStep[0] * nHeight;
+		memcpy(pDst[0], pMainSrc[0], size);
 
 		/* The first half of U, V are already here part of this frame. */
 		/* B2 and B3 */
@@ -141,19 +142,19 @@ static pstatus_t general_YUV420CombineToYUV444(
  */
 
 static pstatus_t general_YUV444ToRGB_8u_P3AC4R(
-		const BYTE* pSrc[3], const INT32 srcStep[3],
-		BYTE* pDst, INT32 dstStep, const prim_size_t* roi)
+		const BYTE* pSrc[3], const UINT32 srcStep[3],
+		BYTE* pDst, UINT32 dstStep, const prim_size_t* roi)
 {
-	INT32 x, y;
+	UINT32 x, y;
 	BYTE Y, U, V;
-	INT32 R, G, B;
-	INT32 Yp, Up, Vp;
-	INT32 Up48, Up475;
-	INT32 Vp403, Vp120;
-	INT32 nWidth, nHeight;
+	UINT32 R, G, B;
+	UINT32 Yp, Up, Vp;
+	UINT32 Up48, Up475;
+	UINT32 Vp403, Vp120;
+	UINT32 nWidth, nHeight;
 
-	nWidth = roi->width;
-	nHeight = roi->height;
+	nWidth = (roi->width) & ~0x0001;
+	nHeight = (roi->height) & ~0x0001;
 
 	for (y = 0; y < nHeight; y++)
 	{
@@ -220,25 +221,25 @@ static pstatus_t general_YUV444ToRGB_8u_P3AC4R(
  */
 
 static pstatus_t general_YUV420ToRGB_8u_P3AC4R(
-		const BYTE* pSrc[3], const INT32 srcStep[3],
-		BYTE* pDst, INT32 dstStep, const prim_size_t* roi)
+		const BYTE* pSrc[3], const UINT32 srcStep[3],
+		BYTE* pDst, UINT32 dstStep, const prim_size_t* roi)
 {
-	INT32 x, y;
-	INT32 dstPad;
-	INT32 srcPad[3];
+	UINT32 x, y;
+	UINT32 dstPad;
+	UINT32 srcPad[3];
 	BYTE Y, U, V;
-	INT32 halfWidth;
-	INT32 halfHeight;
+	UINT32 halfWidth;
+	UINT32 halfHeight;
 	const BYTE* pY;
 	const BYTE* pU;
 	const BYTE* pV;
-	INT32 R, G, B;
-	INT32 Yp, Up, Vp;
-	INT32 Up48, Up475;
-	INT32 Vp403, Vp120;
+	UINT32 R, G, B;
+	UINT32 Yp, Up, Vp;
+	UINT32 Up48, Up475;
+	UINT32 Vp403, Vp120;
 	BYTE* pRGB = pDst;
-	INT32 nWidth, nHeight;
-	INT32 lastRow, lastCol;
+	UINT32 nWidth, nHeight;
+	UINT32 lastRow, lastCol;
 
 	pY = pSrc[0];
 	pU = pSrc[1];
@@ -449,21 +450,21 @@ static pstatus_t general_YUV420ToRGB_8u_P3AC4R(
 }
 
 static pstatus_t general_RGBToYUV420_8u_P3AC4R(
-		const BYTE* pSrc, INT32 srcStep,
-		BYTE* pDst[3], INT32 dstStep[3], const prim_size_t* roi)
+		const BYTE* pSrc, UINT32 srcStep,
+		BYTE* pDst[3], UINT32 dstStep[3], const prim_size_t* roi)
 {
-	INT32 x, y;
-	INT32 dstPad[3];
-	INT32 halfWidth;
-	INT32 halfHeight;
+	UINT32 x, y;
+	UINT32 dstPad[3];
+	UINT32 halfWidth;
+	UINT32 halfHeight;
 	BYTE* pY;
 	BYTE* pU;
 	BYTE* pV;
-	INT32 Y, U, V;
-	INT32 R, G, B;
-	INT32 Ra, Ga, Ba;
+	UINT32 Y, U, V;
+	UINT32 R, G, B;
+	UINT32 Ra, Ga, Ba;
 	const BYTE* pRGB;
-	INT32 nWidth, nHeight;
+	UINT32 nWidth, nHeight;
 
 	pU = pDst[1];
 	pV = pDst[2];

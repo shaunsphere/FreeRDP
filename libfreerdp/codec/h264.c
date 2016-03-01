@@ -826,7 +826,7 @@ static int openh264_decompress(H264_CONTEXT* h264, BYTE* pSrcData, UINT32 SrcSiz
 	SBufferInfo sBufferInfo;
 	SSysMEMBuffer* pSystemBuffer;
 	H264_CONTEXT_OPENH264* sys = (H264_CONTEXT_OPENH264*) h264->pSystemData;
-	INT32* iStride = h264->iStride[plane];
+	UINT32* iStride = h264->iStride[plane];
 	BYTE** pYUVData = h264->pYUVData[plane];
 
 	if (!sys->pDecoder)
@@ -909,7 +909,7 @@ static int openh264_compress(H264_CONTEXT* h264, BYTE** ppDstData, UINT32* pDstS
 	SBitrateInfo bitrate;
 	H264_CONTEXT_OPENH264* sys = (H264_CONTEXT_OPENH264*) h264->pSystemData;
 	BYTE** pYUVData = h264->pYUVData[plane];
-	INT32* iStride = h264->iStride[plane];
+	UINT32* iStride = h264->iStride[plane];
 
 	if (!sys->pEncoder)
 		return -1;
@@ -1396,18 +1396,18 @@ static BOOL avc_yuv_to_rgb(H264_CONTEXT* h264, const RECTANGLE_16* regionRects,
 	{
 
 		const RECTANGLE_16* rect = &(regionRects[x]);
-		const INT32* iStride;
+		const UINT32* iStride;
 		BYTE** ppYUVData;
 
-		if (!use444)
-		{
-			iStride = h264->iStride[0];
-			ppYUVData = h264->pYUVData[0];
-		}
-		else
+		if (use444)
 		{
 			iStride = h264->iYUV444Stride;
 			ppYUVData = h264->pYUV444Data;
+		}
+		else
+		{
+			iStride = h264->iStride[0];
+			ppYUVData = h264->pYUVData[0];
 		}
 
 		if (!check_rect(h264, rect, nDstWidth, nDstHeight))
@@ -1421,29 +1421,26 @@ static BOOL avc_yuv_to_rgb(H264_CONTEXT* h264, const RECTANGLE_16* regionRects,
 		pYUVPoint[0] = ppYUVData[0] + rect->top * iStride[0] + rect->left;
 		pYUVPoint[1] = ppYUVData[1];
 		pYUVPoint[2] = ppYUVData[2];
-		if (!use444)
-		{
-			pYUVPoint[1] += rect->top/2 * iStride[1] + rect->left/2;
-			pYUVPoint[2] += rect->top/2 * iStride[2] + rect->left/2;
-		}
-		else
+		if (use444)
 		{
 			pYUVPoint[1] += rect->top * iStride[1] + rect->left;
 			pYUVPoint[2] += rect->top * iStride[2] + rect->left;
+		}
+		else
+		{
+			pYUVPoint[1] += rect->top/2 * iStride[1] + rect->left/2;
+			pYUVPoint[2] += rect->top/2 * iStride[2] + rect->left/2;
 		}
 
 
 		roi.width = width;
 		roi.height = height;
 
-		if (use444)
-		{
-			if (prims->YUV444ToRGB_8u_P3AC4R(
+		if (use444 && (prims->YUV444ToRGB_8u_P3AC4R(
 				    pYUVPoint, iStride, pDstPoint,
-				    nDstStep, &roi) != PRIMITIVES_SUCCESS)
-			{
+				    nDstStep, &roi) != PRIMITIVES_SUCCESS))
+		{
 						return FALSE;
-			}
 		}
 		else if (prims->YUV420ToRGB_8u_P3AC4R(pYUVPoint, iStride, pDstPoint,
 						 nDstStep, &roi) != PRIMITIVES_SUCCESS)
@@ -1486,7 +1483,7 @@ INT32 avc420_compress(H264_CONTEXT* h264, BYTE* pSrcData, DWORD SrcFormat,
 	prim_size_t roi;
 	int nWidth, nHeight;
 	primitives_t* prims = primitives_get();
-	INT32* iStride;
+	UINT32* iStride;
 	BYTE** pYUVData;
 
 	if (!h264)
@@ -1543,44 +1540,87 @@ INT32 avc444_compress(H264_CONTEXT* h264, BYTE* pSrcData, DWORD SrcFormat,
 }
 
 static BOOL avc444_combine_yuv(H264_CONTEXT* h264,
+			       const RECTANGLE_16* mainRegionRects,
+			       UINT32 numMainRegionRect,
 			       const RECTANGLE_16* auxRegionRects,
 			       UINT32 numAuxRegionRect, UINT32 nDstWidth,
-			       DWORD nDstHeight, INT8 op)
+			       DWORD nDstHeight, UINT32 nDstStep)
 {
 	const primitives_t* prims = primitives_get();
 	prim_size_t roi;
 	UINT32 x;
-	INT32* piDstStride = h264->iYUV444Stride;
-	const INT32* piAuxStride = h264->iStride[1];
-	const INT32* piMainStride = h264->iStride[0];
+	UINT32* piDstSize = h264->iYUV444Size;
+	UINT32* piDstStride = h264->iYUV444Stride;
+	const UINT32* piAuxStride = h264->iStride[1];
+	const UINT32* piMainStride = h264->iStride[0];
 	BYTE* ppYUVTmpData[3];
 	BYTE** ppYUVDstData = h264->pYUV444Data;
 	BYTE** ppYUVAuxData = h264->pYUVData[1];
 	BYTE** ppYUVMainData = h264->pYUVData[0];
 
-	piDstStride[2] = piMainStride[0];
-	piDstStride[1] = piMainStride[0];
-	piDstStride[0] = piMainStride[0];
+	if (nDstStep != piDstStride[0])
+	{
+		piDstStride[2] = nDstStep;
+		piDstStride[1] = nDstStep;
+		piDstStride[0] = nDstStep;
 
-	ppYUVTmpData[0] = realloc(ppYUVDstData[0], piDstStride[0] * nDstHeight);
-	ppYUVTmpData[1] = realloc(ppYUVDstData[1], piDstStride[1] * nDstHeight);
-	ppYUVTmpData[2] = realloc(ppYUVDstData[2], piDstStride[2] * nDstHeight);
+		piDstSize[2] = piDstStride[2] * nDstHeight;
+		piDstSize[1] = piDstStride[1] * nDstHeight;
+		piDstSize[0] = piDstStride[0] * nDstHeight;
 
-	if (!ppYUVTmpData[0] || !ppYUVTmpData[1] || !ppYUVTmpData[2])
-		goto fail;
+		ppYUVTmpData[0] = realloc(ppYUVDstData[0], piDstSize[0]);
+		ppYUVTmpData[1] = realloc(ppYUVDstData[1], piDstSize[1]);
+		ppYUVTmpData[2] = realloc(ppYUVDstData[2], piDstSize[2]);
 
-	ppYUVDstData[0] = ppYUVTmpData[0];
-	ppYUVDstData[1] = ppYUVTmpData[1];
-	ppYUVDstData[2] = ppYUVTmpData[2];
+		if (!ppYUVTmpData[0] || !ppYUVTmpData[1] || !ppYUVTmpData[2])
+			goto fail;
+
+		ppYUVDstData[0] = ppYUVTmpData[0];
+		ppYUVDstData[1] = ppYUVTmpData[1];
+		ppYUVDstData[2] = ppYUVTmpData[2];
+	}
+
+	for (x=0; x<numMainRegionRect; x++)
+	{
+		UINT16 width, height;
+		const RECTANGLE_16* rect = &mainRegionRects[x];
+		const BYTE* pYUVMainPoint[3];
+		BYTE* pYUVDstPoint[3];
+
+		if (!check_rect(h264, rect, nDstWidth, nDstHeight))
+			goto fail;
+
+		width = rect->right - rect->left;
+		height = rect->bottom - rect->top;
+
+		roi.width = width;
+		roi.height = height;
+
+		pYUVMainPoint[0] = ppYUVMainData[0] + rect->top * piMainStride[0] +
+				  rect->left;
+		pYUVMainPoint[1] = ppYUVMainData[1] + rect->top/2 * piMainStride[1] +
+				  rect->left/2;
+		pYUVMainPoint[2] = ppYUVMainData[2] + rect->top/2 * piMainStride[2] +
+				  rect->left/2;
+		pYUVDstPoint[0] = ppYUVDstData[0] + rect->top * piDstStride[0] +
+				  rect->left;
+		pYUVDstPoint[1] = ppYUVDstData[1] + rect->top * piDstStride[1] +
+				  rect->left;
+		pYUVDstPoint[2] = ppYUVDstData[2] + rect->top * piDstStride[2] +
+				  rect->left;
+
+		if (prims->YUV420CombineToYUV444(pYUVMainPoint, piMainStride,
+						 NULL, NULL,
+						 pYUVDstPoint, piDstStride,
+						 &roi) != PRIMITIVES_SUCCESS)
+			goto fail;
+	}
 
 	for (x=0; x<numAuxRegionRect; x++)
 	{
 		UINT16 width, height;
 		const RECTANGLE_16* rect = &auxRegionRects[x];
 		const BYTE* pYUVAuxPoint[3];
-		const BYTE* pYUVMainPoint[3];
-		const BYTE** ppYUVMain = NULL;
-		const BYTE** ppYUVAux = NULL;
 		BYTE* pYUVDstPoint[3];
 
 		if (!check_rect(h264, rect, nDstWidth, nDstHeight))
@@ -1598,36 +1638,15 @@ static BOOL avc444_combine_yuv(H264_CONTEXT* h264,
 				  rect->left/2;
 		pYUVAuxPoint[2] = ppYUVAuxData[2] + rect->top/2 * piAuxStride[2] +
 				  rect->left/2;
-		pYUVMainPoint[0] = ppYUVMainData[0] + rect->top * piMainStride[0] +
+		pYUVDstPoint[0] = ppYUVDstData[0] + rect->top * piDstStride[0] +
 				  rect->left;
-		pYUVMainPoint[1] = ppYUVMainData[1] + rect->top/2 * piMainStride[1] +
-				  rect->left/2;
-		pYUVMainPoint[2] = ppYUVMainData[2] + rect->top/2 * piMainStride[2] +
-				  rect->left/2;
-		pYUVDstPoint[0] = ppYUVDstData[0] + rect->top * piMainStride[0] +
+		pYUVDstPoint[1] = ppYUVDstData[1] + rect->top * piDstStride[1] +
 				  rect->left;
-		pYUVDstPoint[1] = ppYUVDstData[1] + rect->top * piMainStride[1] +
-				  rect->left;
-		pYUVDstPoint[2] = ppYUVDstData[2] + rect->top * piMainStride[2] +
+		pYUVDstPoint[2] = ppYUVDstData[2] + rect->top * piDstStride[2] +
 				  rect->left;
 
-		switch(op)
-		{
-		case 0:
-			ppYUVMain = pYUVMainPoint;
-			ppYUVAux = pYUVAuxPoint;
-			break;
-		case 1:
-			ppYUVMain = pYUVMainPoint;
-			break;
-		case 2:
-			ppYUVAux = pYUVAuxPoint;
-			break;
-		default:
-			break;
-		}
-		if (prims->YUV420CombineToYUV444(ppYUVMain, piMainStride,
-						 ppYUVAux, piAuxStride,
+		if (prims->YUV420CombineToYUV444(NULL, NULL,
+						 pYUVAuxPoint, piAuxStride,
 						 pYUVDstPoint, piDstStride,
 						 &roi) != PRIMITIVES_SUCCESS)
 			goto fail;
@@ -1656,6 +1675,8 @@ INT32 avc444_decompress(H264_CONTEXT* h264, BYTE op,
 {
 	INT32 status = -1;
 	BOOL use444 = FALSE;
+	UINT32 numYuvRects = 0;
+	RECTANGLE_16* yuvRects = NULL;
 	UINT32 numChromaRects = 0;
 	RECTANGLE_16* chromaRects = NULL;
 
@@ -1667,6 +1688,8 @@ INT32 avc444_decompress(H264_CONTEXT* h264, BYTE op,
 	{
 	case 0: /* YUV420 in stream 1
 		 * Chroma420 in stream 2 */
+		numYuvRects = numRegionRects;
+		yuvRects = regionRects;
 		numChromaRects = numAuxRegionRect;
 		chromaRects = auxRegionRects;
 		use444 = TRUE;
@@ -1680,6 +1703,8 @@ INT32 avc444_decompress(H264_CONTEXT* h264, BYTE op,
 		use444 = TRUE;
 	case 1: /* YUV420 in stream 1 */
 		status = h264->subsystem->Decompress(h264, pSrcData, SrcSize, op - 1);
+		numYuvRects = numRegionRects;
+		yuvRects = regionRects;
 		break;
 	default: /* WTF? */
 		break;
@@ -1687,8 +1712,9 @@ INT32 avc444_decompress(H264_CONTEXT* h264, BYTE op,
 
 	if (status >= 0)
 	{
-		if (!avc444_combine_yuv(h264, chromaRects, numChromaRects,
-					nDstWidth, nDstHeight, op))
+		if (!avc444_combine_yuv(h264, yuvRects,	numYuvRects,
+					chromaRects, numChromaRects,
+					nDstWidth, nDstHeight, nDstStep))
 			status = -1002;
 		else if (!avc_yuv_to_rgb(h264, regionRects, numRegionRects, nDstWidth,
 				    nDstHeight, nDstStep, pDstData, DstFormat, use444))

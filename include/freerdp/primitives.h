@@ -58,8 +58,8 @@ typedef INT32 pstatus_t;				/* match IppStatus. */
 /* Structures compatible with IPP */
 typedef struct
 {
-	INT32 width;
-	INT32 height;
+	UINT32 width;
+	UINT32 height;
 } prim_size_t;		/* like IppiSize */
 
 /* Function prototypes for all of the supported primitives. */
@@ -169,21 +169,21 @@ typedef pstatus_t (*__RGB565ToARGB_16u32u_C3C4_t)(
 	UINT32 width, UINT32 height,
 	BOOL alpha, BOOL invert);
 typedef pstatus_t (*__YUV420ToRGB_8u_P3AC4R_t)(
-	const BYTE* pSrc[3], const INT32 srcStep[3],
-	BYTE* pDst, INT32 dstStep,
+	const BYTE* pSrc[3], const UINT32 srcStep[3],
+	BYTE* pDst, UINT32 dstStep,
 	const prim_size_t* roi);
 typedef pstatus_t (*__YUV444ToRGB_8u_P3AC4R_t)(
-	const BYTE* pSrc[3], const INT32 srcStep[3],
-	BYTE* pDst, INT32 dstStep,
+	const BYTE* pSrc[3], const UINT32 srcStep[3],
+	BYTE* pDst, UINT32 dstStep,
 	const prim_size_t* roi);
 typedef pstatus_t (*__RGBToYUV420_8u_P3AC4R_t)(
-	const BYTE* pSrc, INT32 srcStep,
-	BYTE* pDst[3], INT32 dstStep[3],
+	const BYTE* pSrc, UINT32 srcStep,
+	BYTE* pDst[3], UINT32 dstStep[3],
 	const prim_size_t* roi);
 typedef pstatus_t (*__YUV420CombineToYUV444_t)(
-		const BYTE* pMainSrc[3], const INT32 srcMainStep[3],
-		const BYTE* pAuxSrc[3], const INT32 srcAuxStep[3],
-		BYTE* pDst[3], const INT32 dstStep[3],
+		const BYTE* pMainSrc[3], const UINT32 srcMainStep[3],
+		const BYTE* pAuxSrc[3], const UINT32 srcAuxStep[3],
+		BYTE* pDst[3], const UINT32 dstStep[3],
 		const prim_size_t* roi);
 typedef pstatus_t (*__andC_32u_t)(
 	const UINT32 *pSrc,
