@@ -203,22 +203,25 @@ static void func_lock_isoch_mutex(TRANSFER_DATA*  transfer_data)
 	UINT32 FunctionId;
 	UINT32 RequestField;
 	UINT16 URB_Function;
+	wStream* data = transfer_data->pBuffer;
 	IUDEVMAN* udevman = transfer_data->udevman;
 
-	if (transfer_data->cbSize >= 8)
+	if (Stream_GetRemainingLength(data) >= 8)
 	{
-		data_read_UINT32(transfer_data->pBuffer + 4, FunctionId);
+		Stream_Seek_UINT32(data);
+		Stream_Read_UINT32(data, FunctionId);
 
 		if ((FunctionId == TRANSFER_IN_REQUEST ||
 			 FunctionId == TRANSFER_OUT_REQUEST) &&
-				transfer_data->cbSize >= 16)
+				Stream_GetRemainingLength(data) >= 8)
 		{
-			data_read_UINT16(transfer_data->pBuffer + 14, URB_Function);
+			Stream_Seek(data, 6);
+			Stream_Read_UINT16(data, URB_Function);
 
 			if (URB_Function == URB_FUNCTION_ISOCH_TRANSFER &&
-					transfer_data->cbSize >= 20)
+					Stream_GetRemainingLength(data) >= 4)
 			{
-				data_read_UINT32(transfer_data->pBuffer + 16, RequestField);
+				Stream_Read_UINT32(data, RequestField);
 				noAck = (RequestField & 0x80000000)>>31;
 
 				if (!noAck)
@@ -1049,14 +1052,14 @@ fail_create_monfd_event:
 }
 #endif
 
-void* urbdrc_new_device_create(void* arg)
+static void* urbdrc_new_device_create(void* arg)
 {
 	TRANSFER_DATA* transfer_data = (TRANSFER_DATA*) arg;
 	URBDRC_CHANNEL_CALLBACK* callback = transfer_data->callback;
 	IWTSVirtualChannelManager* channel_mgr;
 	URBDRC_PLUGIN* urbdrc = transfer_data->urbdrc;
 	USB_SEARCHMAN* searchman = urbdrc->searchman;
-	BYTE* pBuffer = transfer_data->pBuffer;
+	wStream* pBuffer = transfer_data->pBuffer;
 	IUDEVMAN* udevman = transfer_data->udevman;
 	IUDEVICE* pdev = NULL;
 	UINT32 ChannelId = 0;
@@ -1064,13 +1067,17 @@ void* urbdrc_new_device_create(void* arg)
 	UINT32 FunctionId;
 	int i = 0, found = 0;
 
-	WLog_DBG(TAG, "...");
-
 	channel_mgr = urbdrc->listener_callback->channel_mgr;
 	ChannelId = channel_mgr->GetChannelId(callback->channel);
 
-	data_read_UINT32(pBuffer + 0, MessageId);
-	data_read_UINT32(pBuffer + 4, FunctionId);
+	if (Stream_GetRemainingLength(pBuffer) < 8)
+	{
+		ExitThread(ERROR_INVALID_DATA);
+		return NULL;
+	}
+
+	Stream_Read_UINT32(pBuffer, MessageId);
+	Stream_Read_UINT32(pBuffer, FunctionId);
 
 	int error = 0;
 
@@ -1129,7 +1136,8 @@ void* urbdrc_new_device_create(void* arg)
 		break;
 	}
 
-	return 0;
+	ExitThread(CHANNEL_RC_OK);
+	return NULL;
 }
 
 /**
@@ -1169,26 +1177,25 @@ static UINT urbdrc_process_channel_notification(URBDRC_CHANNEL_CALLBACK* callbac
 		transfer_data->urbdrc = urbdrc;
 		transfer_data->udevman = urbdrc->udevman;
 		transfer_data->urbdrc = urbdrc;
-		transfer_data->cbSize = Stream_GetRemainingLength(pBuffer);
-		transfer_data->pBuffer = (BYTE*) malloc(transfer_data->cbSize);
+		transfer_data->pBuffer = Stream_New(NULL, Stream_GetRemainingLength(pBuffer));
 		if (!transfer_data->pBuffer)
 		{
 			free(transfer_data);
 			return ERROR_OUTOFMEMORY;
 		}
 
-		memcpy(transfer_data->pBuffer, Stream_Pointer(pBuffer), transfer_data->cbSize);
+		Stream_Copy(pBuffer, transfer_data->pBuffer, Stream_Capacity(transfer_data->pBuffer));
 
 		thread = CreateThread(NULL, 0, (LPTHREAD_START_ROUTINE)urbdrc_new_device_create, transfer_data, 0, NULL);
 		if (!thread)
 		{
-			free(transfer_data->pBuffer);
+			Stream_Free(transfer_data->pBuffer, TRUE);
 			free(transfer_data);
 			return ERROR_INVALID_OPERATION;
 		}
 		if (!CloseHandle(thread))
 		{
-			free(transfer_data->pBuffer);
+			Stream_Free(transfer_data->pBuffer, TRUE);
 			free(transfer_data);
 			return ERROR_INVALID_OPERATION;
 		}
@@ -1262,16 +1269,16 @@ static UINT urbdrc_on_data_received(IWTSVirtualChannelCallback* pChannelCallback
 		transfer_data->callback = callback;
 		transfer_data->urbdrc = urbdrc;
 		transfer_data->udevman = udevman;
-		transfer_data->cbSize = Stream_GetRemainingLength(data);
 		transfer_data->UsbDevice = InterfaceId;
-		transfer_data->pBuffer = (BYTE *)malloc(transfer_data->cbSize);
+		transfer_data->pBuffer = Stream_New(NULL, Stream_GetRemainingLength(data));
 		if (!transfer_data->pBuffer)
 		{
 			free(transfer_data);
 			return ERROR_OUTOFMEMORY;
 		}
 
-		memcpy(transfer_data->pBuffer, Stream_Pointer(data), transfer_data->cbSize);
+		Stream_Copy(data, transfer_data->pBuffer, Stream_Capacity(transfer_data->pBuffer));
+		Stream_SetPosition(transfer_data->pBuffer, 0);
 
 		/* To ensure that not too many urb requests at the same time */
 		udevman->wait_urb(udevman);
@@ -1286,14 +1293,14 @@ static UINT urbdrc_on_data_received(IWTSVirtualChannelCallback* pChannelCallback
 		if (!thread)
 		{
 			WLog_ERR(TAG, "Create Data Transfer Thread got error = %d", error);
-			free(transfer_data->pBuffer);
+			Stream_Free(transfer_data->pBuffer, TRUE);
 			free(transfer_data);
 			return ERROR_INVALID_OPERATION;
 		}
 
 		if (!CloseHandle(thread))
 		{
-			free(transfer_data->pBuffer);
+			Stream_Free(transfer_data->pBuffer, TRUE);
 			free(transfer_data);
 			return ERROR_INVALID_OPERATION;
 		}
@@ -1493,14 +1500,14 @@ static UINT urbdrc_load_udevman_addin(IWTSPlugin* pPlugin, const char* name, ADD
 	return CHANNEL_RC_OK;
 }
 
-BOOL urbdrc_set_subsystem(URBDRC_PLUGIN* urbdrc, char* subsystem)
+static BOOL urbdrc_set_subsystem(URBDRC_PLUGIN* urbdrc, char* subsystem)
 {
 	free(urbdrc->subsystem);
 	urbdrc->subsystem = _strdup(subsystem);
 	return (urbdrc->subsystem != NULL);
 }
 
-COMMAND_LINE_ARGUMENT_A urbdrc_args[] =
+static COMMAND_LINE_ARGUMENT_A urbdrc_args[] =
 {
 	{ "dbg", COMMAND_LINE_VALUE_FLAG, "", NULL, BoolValueFalse, -1, NULL, "debug" },
 	{ "sys", COMMAND_LINE_VALUE_REQUIRED, "<subsystem>", NULL, NULL, -1, NULL, "subsystem" },
@@ -1595,9 +1602,8 @@ UINT DVCPluginEntry(IDRDYNVC_ENTRY_POINTS* pEntryPoints)
 	status = urbdrc_process_addin_args(urbdrc, args);
 	if (status != CHANNEL_RC_OK)
 	{
-		/* TODO: we should unregister the plugin ? */
 		WLog_ERR(TAG, "error processing arguments");
-		//return status;
+		return status;
 	}
 
 

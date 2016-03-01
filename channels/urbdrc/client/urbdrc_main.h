@@ -96,8 +96,7 @@ struct _TRANSFER_DATA
 	URBDRC_CHANNEL_CALLBACK* callback;
 	URBDRC_PLUGIN* urbdrc;
 	IUDEVMAN* udevman;
-	BYTE* pBuffer;
-	UINT32 cbSize;
+	wStream* pBuffer;
 	UINT32 UsbDevice;
 };
 
