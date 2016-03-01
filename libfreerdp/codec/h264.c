@@ -1767,9 +1767,15 @@ BOOL h264_context_init(H264_CONTEXT* h264)
 	return FALSE;
 }
 
-int h264_context_reset(H264_CONTEXT* h264)
+BOOL h264_context_reset(H264_CONTEXT* h264, UINT32 width, UINT32 height)
 {
-	return 1;
+	if (!h264)
+		return FALSE;
+
+	h264->width = width;
+	h264->height = height;
+
+	return TRUE;
 }
 
 H264_CONTEXT* h264_context_new(BOOL Compressor)

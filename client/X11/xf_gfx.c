@@ -48,14 +48,22 @@ static UINT xf_ResetGraphics(RdpgfxClientContext* context, RDPGFX_RESET_GRAPHICS
 		if (!surface || !surface->outputMapped)
 			continue;
 
-		freerdp_client_codecs_reset(surface->codecs, FREERDP_CODEC_ALL);
+		if (!freerdp_client_codecs_reset(surface->codecs, FREERDP_CODEC_ALL,
+						 surface->width, surface->height))
+		{
+			free(pSurfaceIds);
+			return ERROR_INTERNAL_ERROR;
+		}
 
 		region16_clear(&surface->invalidRegion);
 	}
 
 	free(pSurfaceIds);
 
-	freerdp_client_codecs_reset(xfc->codecs, FREERDP_CODEC_ALL);
+	if (!freerdp_client_codecs_reset(xfc->codecs, FREERDP_CODEC_ALL,
+					 xfc->settings->DesktopWidth,
+					 xfc->settings->DesktopHeight))
+		return ERROR_INTERNAL_ERROR;
 
 	xfc->graphicsReset = TRUE;
 
@@ -787,6 +795,13 @@ static UINT xf_CreateSurface(RdpgfxClientContext* context, RDPGFX_CREATE_SURFACE
 	{
 		free (surface);
 		return CHANNEL_RC_NO_MEMORY;
+	}
+
+	if (!freerdp_client_codecs_reset(surface->codecs, FREERDP_CODEC_ALL,
+					 createSurface->width, createSurface->height))
+	{
+		free (surface);
+		return ERROR_INTERNAL_ERROR;
 	}
 
 	surface->surfaceId = createSurface->surfaceId;
