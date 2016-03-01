@@ -238,31 +238,33 @@ static void func_lock_isoch_mutex(TRANSFER_DATA*  transfer_data)
  *
  * @return 0 on success, otherwise a Win32 error code
  */
-static UINT urbdrc_process_capability_request(URBDRC_CHANNEL_CALLBACK* callback, char* data, UINT32 data_sizem, UINT32 MessageId)
+static UINT urbdrc_process_capability_request(URBDRC_CHANNEL_CALLBACK* callback, wStream* data, UINT32 MessageId)
 {
 	UINT32 InterfaceId;
 	UINT32 Version;
-	UINT32 out_size;
-	char * out_data;
+	wStream* out_data;
 	UINT ret;
 
-	WLog_VRB(TAG, "");
-	data_read_UINT32(data + 0, Version);
+	if (Stream_GetRemainingLength(data) < 4)
+		return ERROR_INVALID_DATA;
+
+	Stream_Read_UINT32(data, Version);
 
 	InterfaceId = ((STREAM_ID_NONE<<30) | CAPABILITIES_NEGOTIATOR);
 
-	out_size = 16;
-	out_data = (char *) calloc(1, out_size);
+	out_data = Stream_New(NULL, 16);
 	if (!out_data)
 		return ERROR_OUTOFMEMORY;
 
-	data_write_UINT32(out_data + 0, InterfaceId); /* interface id */
-	data_write_UINT32(out_data + 4, MessageId); /* message id */
-	data_write_UINT32(out_data + 8, Version); /* usb protocol version */
-	data_write_UINT32(out_data + 12, 0x00000000); /* HRESULT */
+	Stream_Write_UINT32(out_data, InterfaceId); /* interface id */
+	Stream_Write_UINT32(out_data, MessageId); /* message id */
+	Stream_Write_UINT32(out_data, Version); /* usb protocol version */
+	Stream_Write_UINT32(out_data, 0x00000000); /* HRESULT */
+	Stream_SealLength(out_data);
 
-	ret = callback->channel->Write(callback->channel, out_size, (BYTE*) out_data, NULL);
-	free(out_data);
+	ret = callback->channel->Write(callback->channel, Stream_Length(out_data),
+								   Stream_Buffer(out_data), NULL);
+	Stream_Free(out_data, TRUE);
 
 	return ret;
 }
@@ -272,36 +274,39 @@ static UINT urbdrc_process_capability_request(URBDRC_CHANNEL_CALLBACK* callback,
  *
  * @return 0 on success, otherwise a Win32 error code
  */
-static UINT urbdrc_process_channel_create(URBDRC_CHANNEL_CALLBACK* callback, char* data, UINT32 data_sizem, UINT32 MessageId)
+static UINT urbdrc_process_channel_create(URBDRC_CHANNEL_CALLBACK* callback, wStream* data, UINT32 MessageId)
 {
 	UINT32 InterfaceId;
-	UINT32 out_size;
 	UINT32 MajorVersion;
 	UINT32 MinorVersion;
 	UINT32 Capabilities;
-	char* out_data;
+	wStream* out_data;
 	UINT ret;
 
-	WLog_VRB(TAG, "");
-	data_read_UINT32(data + 0, MajorVersion);
-	data_read_UINT32(data + 4, MinorVersion);
-	data_read_UINT32(data + 8, Capabilities);
+	if (Stream_GetRemainingLength(data) < 12)
+		return ERROR_INVALID_DATA;
+
+	Stream_Read_UINT32(data, MajorVersion);
+	Stream_Read_UINT32(data, MinorVersion);
+	Stream_Read_UINT32(data, Capabilities);
 
 	InterfaceId = ((STREAM_ID_PROXY<<30) | CLIENT_CHANNEL_NOTIFICATION);
 
-	out_size = 24;
-	out_data = (char*) calloc(1, out_size);
+	out_data = Stream_New(NULL, 24);
 	if (!out_data)
 		return ERROR_OUTOFMEMORY;
 
-	data_write_UINT32(out_data + 0, InterfaceId); /* interface id */
-	data_write_UINT32(out_data + 4, MessageId); /* message id */
-	data_write_UINT32(out_data + 8, CHANNEL_CREATED); /* function id */
-	data_write_UINT32(out_data + 12, MajorVersion);
-	data_write_UINT32(out_data + 16, MinorVersion);
-	data_write_UINT32(out_data + 20, Capabilities); /* capabilities version */
-	ret = callback->channel->Write(callback->channel, out_size, (BYTE *)out_data, NULL);
-	free(out_data);
+	Stream_Write_UINT32(out_data, InterfaceId); /* interface id */
+	Stream_Write_UINT32(out_data, MessageId); /* message id */
+	Stream_Write_UINT32(out_data, CHANNEL_CREATED); /* function id */
+	Stream_Write_UINT32(out_data, MajorVersion);
+	Stream_Write_UINT32(out_data, MinorVersion);
+	Stream_Write_UINT32(out_data, Capabilities); /* capabilities version */
+	Stream_SealLength(out_data);
+
+	ret = callback->channel->Write(callback->channel, Stream_Length(out_data),
+								   Stream_Buffer(out_data), NULL);
+	Stream_Free(out_data, TRUE);
 
 	return ret;
 }
@@ -455,20 +460,23 @@ static UINT urdbrc_send_usb_device_add(URBDRC_CHANNEL_CALLBACK* callback, IUDEVI
  *
  * @return 0 on success, otherwise a Win32 error code
  */
-static UINT urbdrc_exchange_capabilities(URBDRC_CHANNEL_CALLBACK* callback, char* pBuffer, UINT32 cbSize)
+static UINT urbdrc_exchange_capabilities(URBDRC_CHANNEL_CALLBACK* callback, wStream* pBuffer)
 {
 	UINT32 MessageId;
 	UINT32 FunctionId;
 
 	UINT error = CHANNEL_RC_OK;
 
-	data_read_UINT32(pBuffer + 0, MessageId);
-	data_read_UINT32(pBuffer + 4, FunctionId);
+	if (Stream_GetRemainingLength(pBuffer) < 8)
+		return 1;
+
+	Stream_Read_UINT32(pBuffer, MessageId);
+	Stream_Read_UINT32(pBuffer, FunctionId);
 
 	switch (FunctionId)
 	{
 	case RIM_EXCHANGE_CAPABILITY_REQUEST:
-		error = urbdrc_process_capability_request(callback, pBuffer + 8, cbSize - 8, MessageId);
+		error = urbdrc_process_capability_request(callback, pBuffer, MessageId);
 		break;
 
 	default:
@@ -1129,23 +1137,23 @@ void* urbdrc_new_device_create(void* arg)
  *
  * @return 0 on success, otherwise a Win32 error code
  */
-static UINT urbdrc_process_channel_notification(URBDRC_CHANNEL_CALLBACK* callback, char* pBuffer, UINT32 cbSize)
+static UINT urbdrc_process_channel_notification(URBDRC_CHANNEL_CALLBACK* callback, wStream* pBuffer)
 {
-	int i;
 	UINT32 MessageId;
 	UINT32 FunctionId;
 	UINT error = CHANNEL_RC_OK;
 	URBDRC_PLUGIN* urbdrc = (URBDRC_PLUGIN*) callback->plugin;
 
-	WLog_DBG(TAG, "...");
+	if (Stream_GetRemainingLength(pBuffer) < 8)
+		return ERROR_INVALID_DATA;
 
-	data_read_UINT32(pBuffer + 0, MessageId);
-	data_read_UINT32(pBuffer + 4, FunctionId);
+	Stream_Read_UINT32(pBuffer, MessageId);
+	Stream_Read_UINT32(pBuffer, FunctionId);
 
 	switch (FunctionId)
 	{
 	case CHANNEL_CREATED:
-		error = urbdrc_process_channel_create(callback, pBuffer + 8, cbSize - 8, MessageId);
+		error = urbdrc_process_channel_create(callback, pBuffer, MessageId);
 		break;
 
 	case RIMCALL_RELEASE:
@@ -1161,18 +1169,15 @@ static UINT urbdrc_process_channel_notification(URBDRC_CHANNEL_CALLBACK* callbac
 		transfer_data->urbdrc = urbdrc;
 		transfer_data->udevman = urbdrc->udevman;
 		transfer_data->urbdrc = urbdrc;
-		transfer_data->cbSize = cbSize;
-		transfer_data->pBuffer = (BYTE*) malloc((cbSize));
+		transfer_data->cbSize = Stream_GetRemainingLength(pBuffer);
+		transfer_data->pBuffer = (BYTE*) malloc(transfer_data->cbSize);
 		if (!transfer_data->pBuffer)
 		{
 			free(transfer_data);
 			return ERROR_OUTOFMEMORY;
 		}
 
-		for (i = 0; i < (cbSize); i++)
-		{
-			transfer_data->pBuffer[i] = pBuffer[i];
-		}
+		memcpy(transfer_data->pBuffer, Stream_Pointer(pBuffer), transfer_data->cbSize);
 
 		thread = CreateThread(NULL, 0, (LPTHREAD_START_ROUTINE)urbdrc_new_device_create, transfer_data, 0, NULL);
 		if (!thread)
@@ -1211,8 +1216,9 @@ static UINT urbdrc_on_data_received(IWTSVirtualChannelCallback* pChannelCallback
 	UINT32 InterfaceId;
 	UINT32 Mask;
 	UINT error = CHANNEL_RC_OK;
-	char* pBuffer = (char*)Stream_Pointer(data);
-	UINT32 cbSize = Stream_GetRemainingLength(data);
+
+	if (Stream_GetRemainingLength(data) < 4)
+		return -1;
 
 	if (callback == NULL)
 		return 0;
@@ -1227,19 +1233,18 @@ static UINT urbdrc_on_data_received(IWTSVirtualChannelCallback* pChannelCallback
 
 	udevman = (IUDEVMAN*) urbdrc->udevman;
 
-	data_read_UINT32(pBuffer + 0, InterfaceTemp);
+	Stream_Read_UINT32(data, InterfaceTemp);
 	InterfaceId = (InterfaceTemp & 0x0fffffff);
 	Mask = ((InterfaceTemp & 0xf0000000)>>30);
-	WLog_VRB(TAG, "Size=%d InterfaceId=0x%X Mask=0x%X", cbSize, InterfaceId, Mask);
 
 	switch (InterfaceId)
 	{
 	case CAPABILITIES_NEGOTIATOR:
-		error = urbdrc_exchange_capabilities(callback, pBuffer + 4, cbSize - 4);
+		error = urbdrc_exchange_capabilities(callback, data);
 		break;
 
 	case SERVER_CHANNEL_NOTIFICATION:
-		error = urbdrc_process_channel_notification(callback, pBuffer + 4, cbSize - 4);
+		error = urbdrc_process_channel_notification(callback, data);
 		break;
 
 	default:
@@ -1257,16 +1262,16 @@ static UINT urbdrc_on_data_received(IWTSVirtualChannelCallback* pChannelCallback
 		transfer_data->callback = callback;
 		transfer_data->urbdrc = urbdrc;
 		transfer_data->udevman = udevman;
-		transfer_data->cbSize = cbSize - 4;
+		transfer_data->cbSize = Stream_GetRemainingLength(data);
 		transfer_data->UsbDevice = InterfaceId;
-		transfer_data->pBuffer = (BYTE *)malloc((cbSize - 4));
+		transfer_data->pBuffer = (BYTE *)malloc(transfer_data->cbSize);
 		if (!transfer_data->pBuffer)
 		{
 			free(transfer_data);
 			return ERROR_OUTOFMEMORY;
 		}
 
-		memcpy(transfer_data->pBuffer, pBuffer + 4, (cbSize - 4));
+		memcpy(transfer_data->pBuffer, Stream_Pointer(data), transfer_data->cbSize);
 
 		/* To ensure that not too many urb requests at the same time */
 		udevman->wait_urb(udevman);
