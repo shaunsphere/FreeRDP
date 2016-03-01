@@ -2308,8 +2308,9 @@ void* urbdrc_process_udev_data_transfer(void* arg)
 {
 	TRANSFER_DATA*  transfer_data = (TRANSFER_DATA*) arg;
 	URBDRC_CHANNEL_CALLBACK * callback = transfer_data->callback;
-	BYTE *		pBuffer		= transfer_data->pBuffer;
-	UINT32		cbSize		= transfer_data->cbSize;
+	wStream* data = transfer_data->pBuffer;
+	BYTE *		pBuffer		= Stream_Pointer(data);
+	UINT32		cbSize		= Stream_GetRemainingLength(data);
 	UINT32		UsbDevice	= transfer_data->UsbDevice;
 	IUDEVMAN *	udevman		= transfer_data->udevman;
 	UINT32		MessageId;
