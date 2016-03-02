@@ -53,8 +53,8 @@ static pstatus_t general_YUV420CombineToYUV444(
 	BYTE* pV;
 	BYTE* pY;
 
-	nWidth = roi->width & ~0x01;
-	nHeight = roi->height & ~0x01;
+	nWidth = roi->width;
+	nHeight = roi->height;
 	halfWidth = nWidth / 2;
 	halfHeight = nHeight / 2;
 
@@ -137,77 +137,50 @@ static pstatus_t general_YUV420CombineToYUV444(
 }
 
 /**
- * | R |    ( | 256     0    403 | |    Y    | )
- * | G | = (  | 256   -48   -120 | | U - 128 |  ) >> 8
- * | B |    ( | 256   475      0 | | V - 128 | )
+ * | R |   ( | 256     0    403 | |    Y    | )
+ * | G | = ( | 256   -48   -120 | | U - 128 | ) >> 8
+ * | B |   ( | 256   475      0 | | V - 128 | )
  *
- * | Y |    ( |  54   183     18 | | R | )         |  0  |
- * | U | = (  | -29   -99    128 | | G |  ) >> 8 + | 128 |
- * | V |    ( | 128  -116    -12 | | B | )         | 128 |
+ * | Y |    ( |  54   183     18 | | R | )        |  0  |
+ * | U | =  ( | -29   -99    128 | | G | ) >> 8 + | 128 |
+ * | V |    ( | 128  -116    -12 | | B | )        | 128 |
  */
+#define CLIP(X) ( (X) > 255 ? 255 : (X) < 0 ? 0 : X)
+
+#define C(Y) ( (Y) -   0 )
+#define D(U) ( (U) - 128 )
+#define E(V) ( (V) - 128 )
+
+#define YUV2R(Y, U, V) CLIP(( 256 * C(Y) +   0 * D(U) + 403 * E(V)) >> 8)
+#define YUV2G(Y, U, V) CLIP(( 256 * C(Y) -  48 * D(U) - 120 * E(V)) >> 8)
+#define YUV2B(Y, U, V) CLIP(( 256 * C(Y) + 475 * D(U) +   0 * E(V)) >> 8)
 
 static pstatus_t general_YUV444ToRGB_8u_P3AC4R(
 		const BYTE* pSrc[3], const UINT32 srcStep[3],
 		BYTE* pDst, UINT32 dstStep, const prim_size_t* roi)
 {
 	UINT32 x, y;
-	BYTE Y, U, V;
-	UINT32 R, G, B;
-	UINT32 Yp, Up, Vp;
-	UINT32 Up48, Up475;
-	UINT32 Vp403, Vp120;
 	UINT32 nWidth, nHeight;
 
-	nWidth = (roi->width) & ~0x0001;
-	nHeight = (roi->height) & ~0x0001;
+	nWidth = roi->width;
+	nHeight = roi->height;
 
 	for (y = 0; y < nHeight; y++)
 	{
 		const BYTE* pY = pSrc[0] + y * srcStep[0];
 		const BYTE* pU = pSrc[1] + y * srcStep[1];
 		const BYTE* pV = pSrc[2] + y * srcStep[2];
-		BYTE* pRGB = pDst + y * dstStep * 4;
+		BYTE* pRGB = pDst + y * dstStep;
 
 		for (x = 0; x < nWidth; x++)
 		{
-			Y = pY[x];
-			U = pU[x];
-			V = pV[x];
+			const BYTE Y = pY[x];
+			const BYTE U = pU[x];
+			const BYTE V = pV[x];
 
-			Up = U - 128;
-			Vp = V - 128;
-
-			Up48 = 48 * Up;
-			Up475 = 475 * Up;
-
-			Vp403 = Vp * 403;
-			Vp120 = Vp * 120;
-
-			/* 3rd pixel */
-			Yp = Y << 8;
-
-			R = (Yp + Vp403) >> 8;
-			G = (Yp - Up48 - Vp120) >> 8;
-			B = (Yp + Up475) >> 8;
-
-			if (R < 0)
-				R = 0;
-			else if (R > 255)
-				R = 255;
-
-			if (G < 0)
-				G = 0;
-			else if (G > 255)
-				G = 255;
-
-			if (B < 0)
-				B = 0;
-			else if (B > 255)
-				B = 255;
-
-			pRGB[0] = (BYTE) B;
-			pRGB[1] = (BYTE) G;
-			pRGB[2] = (BYTE) R;
+			pRGB[0] = YUV2B(Y, U, V);
+			pRGB[1] = YUV2G(Y, U, V);
+			pRGB[2] = YUV2R(Y, U, V);
 			pRGB[3] = 0xFF;
 		}
 	}
