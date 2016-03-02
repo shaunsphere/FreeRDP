@@ -95,18 +95,20 @@ static IUDEVICE* udevman_get_next(IUDEVMAN* idevman)
 	return pdev;
 }
 
-static IUDEVICE* udevman_get_udevice_by_addr(IUDEVMAN* idevman, int bus_number, int dev_number)
+static IUDEVICE* udevman_get_udevice_by_addr(IUDEVMAN* idevman,
+											 UINT16 bus_number, UINT16 dev_number)
 {
-	IUDEVICE* pdev;
-
 	idevman->loading_lock(idevman);
 	idevman->rewind(idevman);
 
 	while (idevman->has_next(idevman))
 	{
-		pdev = idevman->get_next(idevman);
+		UINT16 bus, dev;
+		IUDEVICE* pdev = idevman->get_next(idevman);
 
-		if ((pdev->get_bus_number(pdev) == bus_number) && (pdev->get_dev_number(pdev) == dev_number))
+		bus = pdev->get_bus_number(pdev);
+		dev = pdev->get_dev_number(pdev);
+		if ((bus == bus_number) && (dev == dev_number))
 		{
 			idevman->loading_unlock(idevman);
 			return pdev;
@@ -114,13 +116,12 @@ static IUDEVICE* udevman_get_udevice_by_addr(IUDEVMAN* idevman, int bus_number, 
 	}
 
 	idevman->loading_unlock(idevman);
-	WLog_WARN(TAG, "bus:%d dev:%d not exist in udevman",
-			  bus_number, dev_number);
 	return NULL;
 }
 
-static int udevman_register_udevice(IUDEVMAN* idevman, int bus_number, int dev_number,
-									int UsbDevice, UINT16 idVendor, UINT16 idProduct, int flag)
+static int udevman_register_udevice(IUDEVMAN* idevman, UINT16 bus_number,
+									UINT16 dev_number, UINT16 UsbDevice,
+									UINT16 idVendor, UINT16 idProduct, UINT32 flag)
 {
 	UDEVMAN* udevman = (UDEVMAN*) idevman;
 	IUDEVICE* pdev = NULL;
@@ -130,9 +131,13 @@ static int udevman_register_udevice(IUDEVMAN* idevman, int bus_number, int dev_n
 	pdev = (IUDEVICE*) udevman_get_udevice_by_addr(idevman, bus_number, dev_number);
 
 	if (pdev != NULL)
+	{
+		WLog_WARN(TAG, "Device %04X:%04X [%02X:%02X] already registered!",
+				  idVendor, idProduct, bus_number, dev_number);
 		return 0;
+	}
 	
-	if (flag == UDEVMAN_FLAG_ADD_BY_ADDR)
+	if (flag & UDEVMAN_FLAG_ADD_BY_ADDR)
 	{
 		pdev = udev_new_by_addr(bus_number, dev_number);
 
@@ -159,18 +164,20 @@ static int udevman_register_udevice(IUDEVMAN* idevman, int bus_number, int dev_n
 		udevman->device_num += 1;
 		idevman->loading_unlock(idevman);
 	}
-	else if (flag == UDEVMAN_FLAG_ADD_BY_VID_PID)
-	{
+	else if (flag & UDEVMAN_FLAG_ADD_BY_VID_PID)
+	{		
 		addnum = 0;
 		/* register all device that match pid vid */
 		num = udev_new_by_id(idVendor, idProduct, &devArray);
 
 		for (i = 0; i < num; i++)
 		{
+			UINT16 bus, dev;
 			pdev = devArray[i];
 
-			if (udevman_get_udevice_by_addr(idevman,
-											pdev->get_bus_number(pdev), pdev->get_dev_number(pdev)) != NULL)
+			bus = pdev->get_bus_number(pdev);
+			dev = pdev->get_dev_number(pdev);
+			if (udevman_get_udevice_by_addr(idevman, bus, dev) != NULL)
 			{
 				free(pdev);
 				continue;
@@ -203,7 +210,7 @@ static int udevman_register_udevice(IUDEVMAN* idevman, int bus_number, int dev_n
 	}
 	else
 	{
-		WLog_ERR(TAG,  "udevman_register_udevice: function error!!");
+		WLog_ERR(TAG,  "Unsupported flag %08X", flag);
 		return 0;
 	}
 

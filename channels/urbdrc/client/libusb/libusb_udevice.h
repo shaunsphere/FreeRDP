@@ -78,6 +78,6 @@ struct _UDEVICE
 typedef UDEVICE * PUDEVICE;
 
 int udev_new_by_id(UINT16 idVendor, UINT16 idProduct, IUDEVICE ***devArray);
-IUDEVICE* udev_new_by_addr(int bus_number, int dev_number);
+IUDEVICE* udev_new_by_addr(UINT16 bus_number, UINT16 dev_number);
 
 #endif /* __LIBUSB_UDEVICE_H */

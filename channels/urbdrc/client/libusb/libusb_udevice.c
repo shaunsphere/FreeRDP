@@ -1760,15 +1760,14 @@ static IUDEVICE* udev_init(UDEVICE* pdev, UINT16 bus_number, UINT16 dev_number)
 
 	/* Get HUB handle */
 	status = udev_get_hub_handle(pdev, bus_number, dev_number);
-
 	if (status < 0)
 	{
-		WLog_ERR(TAG,  "USB init: Error to get HUB handle!!");
+		WLog_ERR(TAG,  "Failed to get HUB handle for [%02X:%02X]", bus_number,
+				 dev_number);
 		pdev->hub_handle = NULL;
 	}
 
 	pdev->devDescriptor = udev_new_descript(pdev->libusb_dev);
-
 	if (!pdev->devDescriptor)
 	{
 		WLog_ERR(TAG,  "USB init: Error to get device descriptor!!");
@@ -1779,10 +1778,10 @@ static IUDEVICE* udev_init(UDEVICE* pdev, UINT16 bus_number, UINT16 dev_number)
 	num = pdev->devDescriptor->bNumConfigurations;
 
 	status = libusb_get_active_config_descriptor (pdev->libusb_dev, &pdev->LibusbConfig);
-
 	if (status < 0)
 	{
-		WLog_ERR(TAG,  "libusb_get_descriptor: ERROR!!ret:%d", status);
+		WLog_ERR(TAG,  "Failed to get config descriptor for [%02X:%02X] %s [%08X]",
+				 bus_number, dev_number, libusb_error_name(status), status);
 		free(pdev);
 		return NULL;
 	}
@@ -1801,17 +1800,17 @@ static IUDEVICE* udev_init(UDEVICE* pdev, UINT16 bus_number, UINT16 dev_number)
 	switch(interface_temp.bInterfaceClass)
 	{
 	case CLASS_RESERVE:
-		//case CLASS_COMMUNICATION_IF:
-		//case CLASS_HID:
-		//case CLASS_PHYSICAL:
+	case CLASS_COMMUNICATION_IF:
+	case CLASS_HID:
+	case CLASS_PHYSICAL:
 	case CLASS_MASS_STORAGE:
 	case CLASS_HUB:
-		//case CLASS_COMMUNICATION_DATA_IF:
+	case CLASS_COMMUNICATION_DATA_IF:
 	case CLASS_SMART_CARD:
 	case CLASS_CONTENT_SECURITY:
-		//case CLASS_WIRELESS_CONTROLLER:
-		//case CLASS_ELSE_DEVICE:
-		WLog_ERR(TAG,  "    Device is not supported!!");
+	case CLASS_WIRELESS_CONTROLLER:
+	case CLASS_ELSE_DEVICE:
+		WLog_WARN(TAG,  "Device class is not supported");
 		free(pdev);
 		return NULL;
 	default:
@@ -1886,34 +1885,46 @@ int udev_new_by_id(UINT16 idVendor, UINT16 idProduct, IUDEVICE*** devArray)
 	LIBUSB_DEVICE_DESCRIPTOR* descriptor;
 	LIBUSB_DEVICE** libusb_list;
 	UDEVICE** array;
-	UINT16 bus_number;
-	UINT16 dev_number;
 	ssize_t i, total_device;
 	int status, num = 0;
 
-	WLog_INFO(TAG, "VID: 0x%04X, PID: 0x%04X", idVendor, idProduct);
-
-	array = (UDEVICE**) malloc(16 * sizeof(UDEVICE*));
+	WLog_INFO(TAG, "Registering device %04X:%04X by VID:PID",
+			  idVendor, idProduct);
 
 	total_device = libusb_get_device_list(NULL, &libusb_list);
 
+	array = (UDEVICE**) realloc(*devArray, total_device * sizeof(UDEVICE*));
+	if (!array)
+		goto fail;
+
 	for (i = 0; i < total_device; i++)
 	{
+		UINT16 vid, pid;
 		descriptor = udev_new_descript(libusb_list[i]);
+		if (!descriptor)
+			continue;
 
-		if ((descriptor->idVendor == idVendor) && (descriptor->idProduct == idProduct))
+		vid = descriptor->idVendor;
+		pid = descriptor->idProduct;
+		free(descriptor);
+
+		if ((vid == idVendor) && (pid == idProduct))
 		{
-			bus_number = 0;
-			dev_number = 0;
-			array[num] = (PUDEVICE) malloc(sizeof(UDEVICE));
+			UINT16 bus_number = 0;
+			UINT16 dev_number = 0;
+
+			array[num] = (PUDEVICE) calloc(1, sizeof(UDEVICE));
+			if (!array[num])
+				goto fail;
+
 			array[num]->libusb_dev = libusb_list[i];
 
 			status = libusb_open(libusb_list[i], &array[num]->libusb_handle);
 
 			if (status < 0)
 			{
-				WLog_ERR(TAG, "libusb_open: (by id) error: 0x%08X (%d)", status, status);
-				free(descriptor);
+				WLog_WARN(TAG, "Failed to open device [%04X:%04X] skipping (%s [%d])",
+						 vid, pid, libusb_error_name(status), status);
 				free(array[num]);
 				continue;
 			}
@@ -1923,10 +1934,11 @@ int udev_new_by_id(UINT16 idVendor, UINT16 idProduct, IUDEVICE*** devArray)
 
 			array[num] = (PUDEVICE) udev_init(array[num], bus_number, dev_number);
 
-			if (array[num] != NULL)
+			if (array[num] == NULL)
+				goto fail;
+			else
 				num++;
 		}
-		free(descriptor);
 	}
 
 	libusb_free_device_list(libusb_list, 1);
@@ -1934,31 +1946,42 @@ int udev_new_by_id(UINT16 idVendor, UINT16 idProduct, IUDEVICE*** devArray)
 	*devArray = (IUDEVICE**) array;
 
 	return num;
+
+fail:
+	libusb_free_device_list(libusb_list, 1);
+	for (i=0; i<num; i++)
+		free (array[i]);
+	free(array);
+	free(*devArray);
+	return -1;
 }
 
-IUDEVICE* udev_new_by_addr(int bus_number, int dev_number)
+IUDEVICE* udev_new_by_addr(UINT16 bus_number, UINT16 dev_number)
 {
 	int status;
 	UDEVICE* pDev;
 
-	WLog_DBG(TAG,"bus:%d dev:%d", bus_number, dev_number);
+	WLog_INFO(TAG, "Registering device [%02X:%02X] by address",
+			  bus_number, dev_number);
 
-	pDev = (PUDEVICE) malloc(sizeof(UDEVICE));
+	pDev = (PUDEVICE) calloc(1, sizeof(UDEVICE));
+	if (!pDev)
+		return NULL;
 
 	pDev->libusb_dev = udev_get_libusb_dev(bus_number, dev_number);
-
 	if (pDev->libusb_dev == NULL)
 	{
-		WLog_ERR(TAG,  "libusb_device_new: ERROR!!");
+		WLog_ERR(TAG,  "Failed to open device [%02X:%02X]",
+				 bus_number, dev_number);
 		free(pDev);
 		return NULL;
 	}
 
 	status = libusb_open(pDev->libusb_dev, &pDev->libusb_handle);
-
 	if (status < 0)
 	{
-		WLog_ERR(TAG,  "libusb_open: (by addr) ERROR!!");
+		WLog_ERR(TAG,  "Failed to open device [%02X:%02X] %s [%08X]",
+				 bus_number, dev_number, libusb_error_name(status), status);
 		free(pDev);
 		return NULL;
 	}

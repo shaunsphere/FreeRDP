@@ -1509,7 +1509,6 @@ static BOOL urbdrc_set_subsystem(URBDRC_PLUGIN* urbdrc, char* subsystem)
 
 static COMMAND_LINE_ARGUMENT_A urbdrc_args[] =
 {
-	{ "dbg", COMMAND_LINE_VALUE_FLAG, "", NULL, BoolValueFalse, -1, NULL, "debug" },
 	{ "sys", COMMAND_LINE_VALUE_REQUIRED, "<subsystem>", NULL, NULL, -1, NULL, "subsystem" },
 	{ NULL, 0, NULL, NULL, NULL, -1, NULL, NULL }
 };
@@ -1527,7 +1526,7 @@ static UINT urbdrc_process_addin_args(URBDRC_PLUGIN* urbdrc, ADDIN_ARGV* args)
 
 	flags = COMMAND_LINE_SIGIL_NONE | COMMAND_LINE_SEPARATOR_COLON| COMMAND_LINE_IGN_UNKNOWN_KEYWORD;
 
-	status = CommandLineParseArgumentsA(args->argc, (const char**) args->argv,
+	status = CommandLineParseArgumentsA(args->argc, args->argv,
 										urbdrc_args, flags, urbdrc, NULL, NULL);
 	if (status < 0)
 		return ERROR_INVALID_DATA;
@@ -1541,10 +1540,6 @@ static UINT urbdrc_process_addin_args(URBDRC_PLUGIN* urbdrc, ADDIN_ARGV* args)
 
 		CommandLineSwitchStart(arg)
 
-				CommandLineSwitchCase(arg, "dbg")
-		{
-			WLog_SetLogLevel(WLog_Get(TAG), WLOG_TRACE);
-		}
 		CommandLineSwitchCase(arg, "sys")
 		{
 			if (!urbdrc_set_subsystem(urbdrc, arg->Value))
@@ -1602,7 +1597,7 @@ UINT DVCPluginEntry(IDRDYNVC_ENTRY_POINTS* pEntryPoints)
 	status = urbdrc_process_addin_args(urbdrc, args);
 	if (status != CHANNEL_RC_OK)
 	{
-		WLog_ERR(TAG, "error processing arguments");
+		WLog_ERR(TAG, "error processing arguments %d", status);
 		return status;
 	}
 

@@ -199,8 +199,9 @@ struct _IUDEVMAN
 	void (*rewind) (IUDEVMAN* idevman);
 	int (*has_next) (IUDEVMAN* idevman);
 	int (*unregister_udevice) (IUDEVMAN* idevman, int bus_number, int dev_number);
-	int (*register_udevice) (IUDEVMAN* idevman, int bus_number,
-							 int dev_number, int UsbDevice, UINT16 idVendor, UINT16 idProduct, int flag);
+	int (*register_udevice) (IUDEVMAN* idevman, UINT16 bus_number,
+							 UINT16 dev_number, UINT16 UsbDevice,
+							 UINT16 idVendor, UINT16 idProduct, UINT32 flag);
 	IUDEVICE *(*get_next) (IUDEVMAN* idevman);
 	IUDEVICE *(*get_udevice_by_UsbDevice) (IUDEVMAN* idevman, UINT32 UsbDevice);
 	IUDEVICE *(*get_udevice_by_UsbDevice_try_again) (IUDEVMAN* idevman, UINT32 UsbDevice);
