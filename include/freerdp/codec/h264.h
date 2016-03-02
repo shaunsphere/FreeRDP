@@ -71,6 +71,7 @@ struct _H264_CONTEXT
 	UINT32 iYUV444Stride[3];
 	BYTE* pYUV444Data[3];
 
+	UINT32 numSystemData;
 	void* pSystemData;
 	H264_CONTEXT_SUBSYSTEM* subsystem;
 };
