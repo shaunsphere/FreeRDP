@@ -1589,7 +1589,8 @@ static BOOL avc444_combine_yuv(H264_CONTEXT* h264,
 	BYTE** ppYUVAuxData = h264->pYUVData[1];
 	BYTE** ppYUVMainData = h264->pYUVData[0];
 
-	if (piMainStride[0] != piDstStride[0])
+	if ((piMainStride[0] != piDstStride[0]) ||
+	    (piDstSize[0] != piMainStride[0] * nDstHeight))
 	{
 		piDstStride[2] = piMainStride[0];
 		piDstStride[1] = piMainStride[0];
@@ -1686,6 +1687,9 @@ static BOOL avc444_combine_yuv(H264_CONTEXT* h264,
 	return TRUE;
 
 fail:
+	free (ppYUVTmpData[0]);
+	free (ppYUVTmpData[1]);
+	free (ppYUVTmpData[2]);
 	free (ppYUVDstData[0]);
 	free (ppYUVDstData[1]);
 	free (ppYUVDstData[2]);
