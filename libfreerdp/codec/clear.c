@@ -793,6 +793,8 @@ int clear_decompress(CLEAR_CONTEXT* clear, BYTE* pSrcData, UINT32 SrcSize,
 
 		if (glyphEntry->count > glyphEntry->size)
 		{
+			UINT32 old = glyphEntry->size;
+			UINT32 diff = glyphEntry->count - old;
 			UINT32 *tmp;
 			glyphEntry->size = glyphEntry->count;
 
@@ -800,6 +802,7 @@ int clear_decompress(CLEAR_CONTEXT* clear, BYTE* pSrcData, UINT32 SrcSize,
 			if (!tmp)
 				return -1;
 			glyphEntry->pixels = tmp;
+			memset(&glyphEntry->pixels[old], 0, diff);
 		}
 
 		if (!glyphEntry->pixels)
@@ -860,7 +863,7 @@ CLEAR_CONTEXT* clear_context_new(BOOL Compressor)
 	nsc_context_set_pixel_format(clear->nsc, RDP_PIXEL_FORMAT_R8G8B8);
 
 	clear->TempSize = 512 * 512 * 4;
-	clear->TempBuffer = (BYTE*) malloc(clear->TempSize);
+	clear->TempBuffer = (BYTE*) calloc(1, clear->TempSize);
 	if (!clear->TempBuffer)
 		goto error_temp_buffer;
 
