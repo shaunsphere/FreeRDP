@@ -26,6 +26,8 @@
 
 #include "prim_YUV.h"
 
+#define CLIP(X) ( (X) > 255 ? 255 : (X) < 0 ? 0 : X)
+
 /**
  * @brief general_YUV420CombineToYUV444
  *	U444(2x,2y) = Um(2x,2y) * 4 - Ua(2x+1,2y) - Ua(2x,2y+1) - Ua(2x+1,2y+1)
@@ -140,13 +142,7 @@ static pstatus_t general_YUV420CombineToYUV444(
  * | R |   ( | 256     0    403 | |    Y    | )
  * | G | = ( | 256   -48   -120 | | U - 128 | ) >> 8
  * | B |   ( | 256   475      0 | | V - 128 | )
- *
- * | Y |    ( |  54   183     18 | | R | )        |  0  |
- * | U | =  ( | -29   -99    128 | | G | ) >> 8 + | 128 |
- * | V |    ( | 128  -116    -12 | | B | )        | 128 |
  */
-#define CLIP(X) ( (X) > 255 ? 255 : (X) < 0 ? 0 : X)
-
 #define C(Y) ( (Y) -   0 )
 #define D(U) ( (U) - 128 )
 #define E(V) ( (V) - 128 )
@@ -192,10 +188,6 @@ static pstatus_t general_YUV444ToRGB_8u_P3AC4R(
  * | R |    ( | 256     0    403 | |    Y    | )
  * | G | = (  | 256   -48   -120 | | U - 128 |  ) >> 8
  * | B |    ( | 256   475      0 | | V - 128 | )
- *
- * | Y |    ( |  54   183     18 | | R | )         |  0  |
- * | U | = (  | -29   -99    128 | | G |  ) >> 8 + | 128 |
- * | V |    ( | 128  -116    -12 | | B | )         | 128 |
  */
 
 static pstatus_t general_YUV420ToRGB_8u_P3AC4R(
@@ -427,6 +419,49 @@ static pstatus_t general_YUV420ToRGB_8u_P3AC4R(
 	return PRIMITIVES_SUCCESS;
 }
 
+/**
+ * | Y |    ( |  54   183     18 | | R | )        |  0  |
+ * | U | =  ( | -29   -99    128 | | G | ) >> 8 + | 128 |
+ * | V |    ( | 128  -116    -12 | | B | )        | 128 |
+ */
+#define RGB2Y(R, G, B) CLIP(( (  54 * (R) + 183 * (G) +  18 * (B) + 128) >> 8) +   0)
+#define RGB2U(R, G, B) CLIP(( ( -29 * (R) -  99 * (G) + 128 * (B) + 128) >> 8) + 128)
+#define RGB2V(R, G, B) CLIP(( ( 128 * (R) - 116 * (G) -  12 * (B) + 128) >> 8) + 128)
+
+static pstatus_t general_RGBToYUV444_8u_P3AC4R(
+		const BYTE* pSrc, const UINT32 srcStep,
+		BYTE* pDst[3], UINT32 dstStep[3], const prim_size_t* roi)
+{
+	UINT32 x, y;
+	UINT32 nWidth, nHeight;
+
+	nWidth = roi->width;
+	nHeight = roi->height;
+
+	for (y=0; y<nHeight; y++)
+	{
+		const BYTE* pR = pSrc + y * srcStep * 4;
+		const BYTE* pG = pSrc + y * srcStep * 4 + 1;
+		const BYTE* pB = pSrc + y * srcStep * 4 + 2;
+		BYTE* pY = pDst[0] + y * dstStep[0];
+		BYTE* pU = pDst[1] + y * dstStep[1];
+		BYTE* pV = pDst[2] + y * dstStep[2];
+
+		for (x=0; x<nWidth; x++)
+		{
+			const BYTE R = pR[x];
+			const BYTE G = pG[x];
+			const BYTE B = pB[x];
+
+			pY[x] = RGB2Y(R, G, B);
+			pU[x] = RGB2U(R, G, B);
+			pV[x] = RGB2V(R, G, B);
+		}
+	}
+
+	return PRIMITIVES_SUCCESS;
+}
+
 static pstatus_t general_RGBToYUV420_8u_P3AC4R(
 		const BYTE* pSrc, UINT32 srcStep,
 		BYTE* pDst[3], UINT32 dstStep[3], const prim_size_t* roi)
@@ -533,6 +568,7 @@ void primitives_init_YUV(primitives_t* prims)
 {
 	prims->YUV420ToRGB_8u_P3AC4R = general_YUV420ToRGB_8u_P3AC4R;
 	prims->RGBToYUV420_8u_P3AC4R = general_RGBToYUV420_8u_P3AC4R;
+	prims->RGBToYUV444_8u_P3AC4R = general_RGBToYUV444_8u_P3AC4R;
 	prims->YUV420CombineToYUV444 = general_YUV420CombineToYUV444;
 	prims->YUV444ToRGB_8u_P3AC4R = general_YUV444ToRGB_8u_P3AC4R;
 
