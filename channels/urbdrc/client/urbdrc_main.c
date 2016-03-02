@@ -128,22 +128,22 @@ static void func_close_udevice(USB_SEARCHMAN* searchman, IUDEVICE* pdev)
 										pdev->get_dev_number(pdev));
 }
 
-static int fun_device_string_send_set(char* out_data, int out_offset, char* str)
+static BOOL fun_device_string_send_set(wStream* data, char* str)
 {
-	int i = 0;
-	int offset = 0;
+	size_t i = 0;
 
 	while (str[i])
 	{
-		data_write_UINT16(out_data + out_offset + offset, str[i]);   /* str */
+		if (!Stream_EnsureRemainingCapacity(data, sizeof(UINT16)))
+			return FALSE;
+
+		Stream_Write_UINT16(data, str[i]);   /* str */
 		i++;
-		offset += 2;
 	}
 
-	data_write_UINT16(out_data + out_offset + offset, 0x0000);   /* add "\0" */
-	offset += 2;
+	Stream_Write_UINT16(data, 0x0000);   /* add "\0" */
 
-	return offset + out_offset;
+	return TRUE;
 }
 
 static int func_container_id_generate(IUDEVICE* pdev, char* strContainerId)
@@ -322,29 +322,32 @@ static UINT urbdrc_process_channel_create(URBDRC_CHANNEL_CALLBACK* callback, wSt
 	return urbdrc_send_channel_Create(callback, MessageId);
 }
 
-static int urdbrc_send_virtual_channel_add(IWTSVirtualChannel* channel, UINT32 MessageId)
+static UINT urdbrc_send_virtual_channel_add(IWTSVirtualChannel* channel, UINT32 MessageId)
 {
+	UINT rc;
 	UINT32 out_size;
 	UINT32 InterfaceId;
-	char* out_data;
-	WLog_VRB(TAG, "");
+	wStream* out_data;
+
 	assert(NULL != channel);
 	assert(NULL != channel->Write);
 
 	InterfaceId = ((STREAM_ID_PROXY<<30) | CLIENT_DEVICE_SINK);
 
 	out_size = 12;
-	out_data = (char*) malloc(out_size);
-	memset(out_data, 0, out_size);
+	out_data = Stream_New(NULL, 12);
+	if (!out_data)
+		return CHANNEL_RC_NO_MEMORY;
 
-	data_write_UINT32(out_data + 0, InterfaceId); /* interface */
-	data_write_UINT32(out_data + 4, MessageId); /* message id */
-	data_write_UINT32(out_data + 8, ADD_VIRTUAL_CHANNEL); /* function id */
+	Stream_Write_UINT32(out_data, InterfaceId); /* interface */
+	Stream_Write_UINT32(out_data, MessageId); /* message id */
+	Stream_Write_UINT32(out_data, ADD_VIRTUAL_CHANNEL); /* function id */
+	Stream_SealLength(out_data);
 
-	channel->Write(channel, out_size, (BYTE*) out_data, NULL);
-	free(out_data);
+	rc = channel->Write(channel, Stream_Length(out_data), Stream_Buffer(out_data), NULL);
+	Stream_Free(out_data, TRUE);
 
-	return 0;
+	return rc;
 }
 
 /**
@@ -354,18 +357,17 @@ static int urdbrc_send_virtual_channel_add(IWTSVirtualChannel* channel, UINT32 M
  */
 static UINT urdbrc_send_usb_device_add(URBDRC_CHANNEL_CALLBACK* callback, IUDEVICE* pdev)
 {
-	char* out_data;
+	wStream* out_data;
 	UINT32 InterfaceId;
 	char HardwareIds[2][DEVICE_HARDWARE_ID_SIZE];
 	char CompatibilityIds[3][DEVICE_COMPATIBILITY_ID_SIZE];
 	char strContainerId[DEVICE_CONTAINER_STR_SIZE];
 	char strInstanceId[DEVICE_INSTANCE_STR_SIZE];
 	char* composite_str = "USB\\COMPOSITE";
-	int size, out_offset, cchCompatIds, bcdUSB;
+	int cchCompatIds, bcdUSB;
 	ISOCH_CALLBACK_QUEUE *cb_queue;
-	UINT ret;
+	UINT ret = CHANNEL_RC_NO_MEMORY;
 
-	WLog_VRB(TAG, "");
 	InterfaceId = ((STREAM_ID_PROXY<<30) | CLIENT_DEVICE_SINK);
 
 	/* USB kernel driver detach!! */
@@ -391,77 +393,73 @@ static UINT urdbrc_send_usb_device_add(URBDRC_CHANNEL_CALLBACK* callback, IUDEVI
 	if (pdev->isCompositeDevice(pdev))
 		cchCompatIds += strlen(composite_str)+1;
 
-	out_offset = 24;
-	size = 24;
-
-	size += (strlen(strInstanceId)+1) * 2 +
-			(strlen(HardwareIds[0]) + 1) * 2 + 4 +
-			(strlen(HardwareIds[1]) + 1) * 2 + 2 +
-			4 + (cchCompatIds) * 2 +
-			(strlen(strContainerId) + 1) * 2 + 4 + 28;
-
-	out_data = (char *)calloc(1, size);
+	out_data = Stream_New(NULL, 60);
 	if (!out_data)
 		return ERROR_OUTOFMEMORY;
 
-	data_write_UINT32(out_data + 0, InterfaceId); /* interface */
-	/* data_write_UINT32(out_data + 4, 0);*/ /* message id */
-	data_write_UINT32(out_data + 8, ADD_DEVICE); /* function id */
-	data_write_UINT32(out_data + 12, 0x00000001); /* NumUsbDevice */
-	data_write_UINT32(out_data + 16, pdev->get_UsbDevice(pdev)); /* UsbDevice */
-	data_write_UINT32(out_data + 20, 0x00000025); /* cchDeviceInstanceId */
+	Stream_Write_UINT32(out_data, InterfaceId); /* interface */
+	Stream_Write_UINT32(out_data, 0); /* message id */
+	Stream_Write_UINT32(out_data, ADD_DEVICE); /* function id */
+	Stream_Write_UINT32(out_data, 0x00000001); /* NumUsbDevice */
+	Stream_Write_UINT32(out_data, pdev->get_UsbDevice(pdev)); /* UsbDevice */
+	Stream_Write_UINT32(out_data, 0x00000025); /* cchDeviceInstanceId */
 
-	out_offset = fun_device_string_send_set(out_data, out_offset, strInstanceId);
+	if (!fun_device_string_send_set(out_data, strInstanceId))
+		goto out;
 
-	data_write_UINT32(out_data + out_offset, 0x00000036); /* cchHwIds */
-	out_offset += 4;
+	Stream_Write_UINT32(out_data, 0x00000036); /* cchHwIds */
 	/* HardwareIds 1 */
-	out_offset = fun_device_string_send_set(out_data, out_offset, HardwareIds[0]);
+	if (!fun_device_string_send_set(out_data, HardwareIds[0]))
+		goto out;
 	/* HardwareIds 2 */
-	out_offset = fun_device_string_send_set(out_data, out_offset, HardwareIds[1]);
-	/*data_write_UINT16(out_data + out_offset, 0x0000);*/ /* add "\0" */
-	out_offset += 2;
+	if (!fun_device_string_send_set(out_data, HardwareIds[1]))
+		goto out;
 
-	data_write_UINT32(out_data + out_offset, cchCompatIds); /* cchCompatIds */
-	out_offset += 4;
+	Stream_Write_UINT32(out_data, cchCompatIds); /* cchCompatIds */
+
 	/* CompatibilityIds 1 */
-	out_offset = fun_device_string_send_set(out_data, out_offset, CompatibilityIds[0]);
+	if (!fun_device_string_send_set(out_data, CompatibilityIds[0]))
+		goto out;
 	/* CompatibilityIds 2 */
-	out_offset = fun_device_string_send_set(out_data, out_offset, CompatibilityIds[1]);
+	if (!fun_device_string_send_set(out_data, CompatibilityIds[1]))
+		goto out;
 	/* CompatibilityIds 3 */
-	out_offset = fun_device_string_send_set(out_data, out_offset, CompatibilityIds[2]);
+	if (!fun_device_string_send_set(out_data, CompatibilityIds[2]))
+		goto out;
 
 	if (pdev->isCompositeDevice(pdev))
-		out_offset = fun_device_string_send_set(out_data, out_offset, composite_str);
+	{
+		if (!fun_device_string_send_set(out_data, composite_str))
+			goto out;
+	}
 
-	/*data_write_UINT16(out_data + out_offset, 0x0000);*/ /* add "\0" */
-	out_offset += 2;
-
-	data_write_UINT32(out_data + out_offset, 0x00000027); /* cchContainerId */
-	out_offset += 4;
+	Stream_Write_UINT32(out_data, 0x00000027); /* cchContainerId */
 	/* ContainerId */
-	out_offset = fun_device_string_send_set(out_data, out_offset, strContainerId);
+	if (!fun_device_string_send_set(out_data, strContainerId))
+		goto out;
 
 	/* USB_DEVICE_CAPABILITIES 28 bytes */
-	data_write_UINT32(out_data + out_offset, 0x0000001c); /* CbSize */
-	data_write_UINT32(out_data + out_offset + 4, 2); /* UsbBusInterfaceVersion, 0 ,1 or 2 */
-	data_write_UINT32(out_data + out_offset + 8, 0x600); /* USBDI_Version, 0x500 or 0x600 */
+	Stream_Write_UINT32(out_data, 0x0000001c); /* CbSize */
+	Stream_Write_UINT32(out_data, 2); /* UsbBusInterfaceVersion, 0 ,1 or 2 */
+	Stream_Write_UINT32(out_data, 0x600); /* USBDI_Version, 0x500 or 0x600 */
 
 	/* Supported_USB_Version, 0x110,0x110 or 0x200(usb2.0) */
 	bcdUSB = pdev->query_device_descriptor(pdev, BCD_USB);
-	data_write_UINT32(out_data + out_offset + 12, bcdUSB);
-	data_write_UINT32(out_data + out_offset + 16, 0x00000000); /* HcdCapabilities, MUST always be zero */
+	Stream_Write_UINT32(out_data, bcdUSB);
+	Stream_Write_UINT32(out_data, 0x00000000); /* HcdCapabilities, MUST always be zero */
 
 	if (bcdUSB < 0x200)
-		data_write_UINT32(out_data + out_offset + 20, 0x00000000); /* DeviceIsHighSpeed */
+		Stream_Write_UINT32(out_data, 0x00000000); /* DeviceIsHighSpeed */
 	else
-		data_write_UINT32(out_data + out_offset + 20, 0x00000001); /* DeviceIsHighSpeed */
+		Stream_Write_UINT32(out_data, 0x00000001); /* DeviceIsHighSpeed */
 
-	data_write_UINT32(out_data + out_offset + 24, 0x50); /* NoAckIsochWriteJitterBufferSizeInMs, >=10 or <=512 */
-	out_offset += 28;
+	Stream_Write_UINT32(out_data, 0x50); /* NoAckIsochWriteJitterBufferSizeInMs, >=10 or <=512 */
+	Stream_SealLength(out_data);
 
-	ret = callback->channel->Write(callback->channel, out_offset, (BYTE *)out_data, NULL);
-	free(out_data);
+	ret = callback->channel->Write(callback->channel, Stream_Length(out_data),
+								   Stream_Buffer(out_data), NULL);
+out:
+	Stream_Free(out_data, TRUE);
 
 	return ret;
 }
