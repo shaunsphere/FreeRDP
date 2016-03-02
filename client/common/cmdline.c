@@ -2419,10 +2419,7 @@ static BOOL freerdp_client_load_static_channel_addin(rdpChannels* channels, rdpS
 	if (entry)
 	{
 		if (freerdp_channels_client_load(channels, settings, entry, data) == 0)
-		{
-			WLog_INFO(TAG, "loading channel %s", name);
 			return TRUE;
-		}
 	}
 
 	return FALSE;
