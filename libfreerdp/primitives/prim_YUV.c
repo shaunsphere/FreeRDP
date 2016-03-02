@@ -48,9 +48,10 @@ static pstatus_t general_YUV420CombineToYUV444(
 	UINT32 x, y;
 	UINT32 halfWidth, halfHeight;
 	const BYTE *Ua, *Va, *Ya;
-	const BYTE *Um, *Vm;
+	const BYTE *Um, *Vm, *Ym;
 	BYTE* pU;
 	BYTE* pV;
+	BYTE* pY;
 
 	nWidth = roi->width & ~0x01;
 	nHeight = roi->height & ~0x01;
@@ -61,8 +62,12 @@ static pstatus_t general_YUV420CombineToYUV444(
 	{
 		/* Y data is already here... */
 		/* B1 */
-		size_t size = dstStep[0] * nHeight;
-		memcpy(pDst[0], pMainSrc[0], size);
+		for (y=0; y<nHeight; y++)
+		{
+			pY = pDst[0] + dstStep[0] * y;
+			Ym = pMainSrc[0] + srcMainStep[0] * y;
+			memcpy(pDst[0], pMainSrc[0], dstStep[0]);
+		}
 
 		/* The first half of U, V are already here part of this frame. */
 		/* B2 and B3 */

@@ -329,6 +329,9 @@ void nsc_context_free(NSC_CONTEXT* context)
 {
 	int i;
 
+	if (!context)
+		return;
+
 	for (i = 0; i < 4; i++)
 	{
 		if (context->priv->PlaneBuffers[i])

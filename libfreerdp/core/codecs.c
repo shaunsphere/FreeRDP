@@ -179,9 +179,7 @@ rdpCodecs* codecs_new(rdpContext* context)
 	codecs = (rdpCodecs*) calloc(1, sizeof(rdpCodecs));
 
 	if (codecs)
-	{
 		codecs->context = context;
-	}
 
 	return codecs;
 }
