@@ -126,9 +126,10 @@ struct _IUDEVICE
 	int (*control_query_device_text) (IUDEVICE* idev, UINT32 TextType,
 									  UINT32 LocaleId, UINT32*BufferSize, BYTE* Buffer);
 
-	int (*os_feature_descriptor_request) (IUDEVICE* idev, UINT32 RequestId, BYTE Recipient,
-										  BYTE InterfaceNumber, BYTE Ms_PageIndex, UINT16 Ms_featureDescIndex, UINT32* UsbdStatus,
-										  UINT32* BufferSize, BYTE* Buffer, int Timeout);
+	UINT (*os_feature_descriptor_request) (IUDEVICE* idev, UINT32 RequestId,
+										   BYTE Recipient, BYTE InterfaceNumber,
+										   BYTE Ms_PageIndex, UINT16 Ms_featureDescIndex,
+										   UINT32* UsbdStatus, wStream* Buffer, int Timeout);
 
 	void (*cancel_all_transfer_request) (IUDEVICE* idev);
 

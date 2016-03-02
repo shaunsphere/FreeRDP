@@ -1021,22 +1021,20 @@ static int libusb_udev_control_query_device_text(IUDEVICE* idev, UINT32 TextType
 }
 
 
-static int libusb_udev_os_feature_descriptor_request(IUDEVICE* idev, UINT32 RequestId,
+static UINT libusb_udev_os_feature_descriptor_request(IUDEVICE* idev,
+													  UINT32 RequestId,
 													 BYTE Recipient,
 													 BYTE InterfaceNumber,
 													 BYTE Ms_PageIndex,
 													 UINT16 Ms_featureDescIndex,
 													 UINT32 * UsbdStatus,
-													 UINT32 * BufferSize,
-													 BYTE* Buffer,
+													 wStream* Buffer,
 													 int Timeout)
 {
 	UDEVICE* pdev = (UDEVICE*) idev;
 	BYTE ms_string_desc[0x13];
 	int error = 0;
-	/*
-	pdev->request_queue->register_request(pdev->request_queue, RequestId, NULL, 0);
-	*/
+
 	memset(ms_string_desc, 0, 0x13);
 	error = libusb_control_transfer(pdev->libusb_handle,
 									LIBUSB_ENDPOINT_IN | Recipient,
@@ -1046,33 +1044,31 @@ static int libusb_udev_os_feature_descriptor_request(IUDEVICE* idev, UINT32 Requ
 									ms_string_desc,
 									0x12,
 									Timeout);
-	//WLog_ERR(TAG,  "Get ms string: result number %d", error);
+
 	if (error > 0)
 	{
-		BYTE bMS_Vendorcode;
-		data_read_BYTE(ms_string_desc + 16, bMS_Vendorcode);
-		//WLog_ERR(TAG,  "bMS_Vendorcode:0x%x", bMS_Vendorcode);
+		BYTE bMS_Vendorcode = ms_string_desc[16];
+
 		/** get os descriptor */
 		error = libusb_control_transfer(pdev->libusb_handle,
 										LIBUSB_ENDPOINT_IN |LIBUSB_REQUEST_TYPE_VENDOR | Recipient,
 										bMS_Vendorcode,
 										(InterfaceNumber << 8) | Ms_PageIndex,
 										Ms_featureDescIndex,
-										Buffer,
-										*BufferSize,
+										Stream_Pointer(Buffer),
+										Stream_GetRemainingLength(Buffer),
 										Timeout);
-		*BufferSize = error;
 	}
 
 	if (error < 0)
 		*UsbdStatus = USBD_STATUS_STALL_PID;
 	else
+	{
+		Stream_Seek(Buffer, error);
 		*UsbdStatus = USBD_STATUS_SUCCESS;
-	/*
-	if(pdev->request_queue->unregister_request(pdev->request_queue, RequestId))
-		WLog_ERR(TAG,  "request_queue_unregister_request: not fount request 0x%x", RequestId);
-	*/
-	return error;
+	}
+
+	return CHANNEL_RC_OK;
 }
 
 static int libusb_udev_query_device_descriptor(IUDEVICE* idev, int offset)
