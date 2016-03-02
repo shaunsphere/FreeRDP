@@ -272,30 +272,15 @@ static UINT urbdrc_process_capability_request(URBDRC_CHANNEL_CALLBACK* callback,
 	return ret;
 }
 
-/**
- * Function description
- *
- * @return 0 on success, otherwise a Win32 error code
- */
-static UINT urbdrc_process_channel_create(URBDRC_CHANNEL_CALLBACK* callback, wStream* data, UINT32 MessageId)
+static UINT urbdrc_send_channel_Create(URBDRC_CHANNEL_CALLBACK* callback, UINT32 MessageId)
 {
-	UINT32 InterfaceId;
-	UINT32 MajorVersion;
-	UINT32 MinorVersion;
-	UINT32 Capabilities;
-	wStream* out_data;
 	UINT ret;
+	UINT32 InterfaceId = ((STREAM_ID_PROXY<<30) | CLIENT_CHANNEL_NOTIFICATION);
+	UINT32 MajorVersion = 1;
+	UINT32 MinorVersion = 0;
+	UINT32 Capabilities = 0;
 
-	if (Stream_GetRemainingLength(data) < 12)
-		return ERROR_INVALID_DATA;
-
-	Stream_Read_UINT32(data, MajorVersion);
-	Stream_Read_UINT32(data, MinorVersion);
-	Stream_Read_UINT32(data, Capabilities);
-
-	InterfaceId = ((STREAM_ID_PROXY<<30) | CLIENT_CHANNEL_NOTIFICATION);
-
-	out_data = Stream_New(NULL, 24);
+	wStream* out_data = Stream_New(NULL, 24);
 	if (!out_data)
 		return ERROR_OUTOFMEMORY;
 
@@ -312,6 +297,29 @@ static UINT urbdrc_process_channel_create(URBDRC_CHANNEL_CALLBACK* callback, wSt
 	Stream_Free(out_data, TRUE);
 
 	return ret;
+}
+/**
+ * Function description
+ *
+ * @return 0 on success, otherwise a Win32 error code
+ */
+static UINT urbdrc_process_channel_create(URBDRC_CHANNEL_CALLBACK* callback, wStream* data, UINT32 MessageId)
+{
+	UINT32 MajorVersion;
+	UINT32 MinorVersion;
+	UINT32 Capabilities;
+
+	if (Stream_GetRemainingLength(data) < 12)
+		return ERROR_INVALID_DATA;
+
+	Stream_Read_UINT32(data, MajorVersion);
+	Stream_Read_UINT32(data, MinorVersion);
+	Stream_Read_UINT32(data, Capabilities);
+
+	if ((MajorVersion != 1) || (MinorVersion != 0) || (Capabilities != 0))
+		return CHANNEL_RC_INITIALIZATION_ERROR;
+
+	return urbdrc_send_channel_Create(callback, MessageId);
 }
 
 static int urdbrc_send_virtual_channel_add(IWTSVirtualChannel* channel, UINT32 MessageId)
@@ -997,7 +1005,7 @@ static void* urbdrc_search_usb_device(void* arg)
 					}
 
 					udevman->loading_unlock(udevman);
-					
+
 					listobj[0] = searchman->term_event;
 					numobj = 1;
 					timeout = 3000; /* milliseconds */
@@ -1360,7 +1368,8 @@ static UINT urbdrc_on_close(IWTSVirtualChannelCallback * pChannelCallback)
  * @return 0 on success, otherwise a Win32 error code
  */
 static UINT urbdrc_on_new_channel_connection(IWTSListenerCallback* pListenerCallback,
-											 IWTSVirtualChannel * pChannel, BYTE* pData, BOOL* pbAccept, IWTSVirtualChannelCallback** ppCallback)
+											 IWTSVirtualChannel * pChannel, BYTE* pData, BOOL* pbAccept,
+											 IWTSVirtualChannelCallback** ppCallback)
 {
 	URBDRC_LISTENER_CALLBACK* listener_callback = (URBDRC_LISTENER_CALLBACK*) pListenerCallback;
 	URBDRC_CHANNEL_CALLBACK* callback;
