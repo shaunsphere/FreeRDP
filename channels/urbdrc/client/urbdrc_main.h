@@ -123,8 +123,8 @@ struct _IUDEVICE
 	int (*control_pipe_request) (IUDEVICE* idev, UINT32 RequestId,
 								 UINT32 EndpointAddress, UINT32* UsbdStatus, int command);
 
-	int (*control_query_device_text) (IUDEVICE* idev, UINT32 TextType,
-									  UINT32 LocaleId, UINT32*BufferSize, BYTE* Buffer);
+	BOOL (*control_query_device_text) (IUDEVICE* idev, UINT32 TextType,
+									  UINT32 LocaleId, wStream* Buffer);
 
 	UINT (*os_feature_descriptor_request) (IUDEVICE* idev, UINT32 RequestId,
 										   BYTE Recipient, BYTE InterfaceNumber,

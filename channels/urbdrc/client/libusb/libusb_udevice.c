@@ -956,15 +956,15 @@ static int libusb_udev_control_pipe_request(IUDEVICE* idev, UINT32 RequestId,
 	return error;
 }
 
-static int libusb_udev_control_query_device_text(IUDEVICE* idev, UINT32 TextType,
+static BOOL libusb_udev_control_query_device_text(IUDEVICE* idev, UINT32 TextType,
 												 UINT32 LocaleId,
-												 UINT32 * BufferSize,
-												 BYTE * Buffer)
+												 wStream* Buffer)
 {
 	UDEVICE* pdev = (UDEVICE*) idev;
 	LIBUSB_DEVICE_DESCRIPTOR * devDescriptor = pdev->devDescriptor;
-	char * strDesc = "Generic Usb String";
+	const char * strDesc = "Generic Usb String";
 	char deviceLocation[25];
+	unsigned char descriptor[255];
 	BYTE bus_number;
 	BYTE device_address;
 	int ret = 0, i = 0;
@@ -974,50 +974,45 @@ static int libusb_udev_control_query_device_text(IUDEVICE* idev, UINT32 TextType
 		ret = libusb_get_string_descriptor (pdev->libusb_handle,
 											devDescriptor->iProduct,
 											LocaleId,
-											Buffer,
-											*BufferSize);
+											descriptor, sizeof(descriptor));
 
-		for(i = 0; i < ret; i++)
-		{
-			Buffer[i] = Buffer[i+2];
-		}
-		ret -= 2;
-
-		if (ret <= 0 || ret < 4){
+		if (ret < 6){
 			WLog_DBG(TAG,"libusb_get_string_descriptor: "
 						 "ERROR num %d, iProduct: %d!", ret, devDescriptor->iProduct);
-			memcpy(Buffer, strDesc, strlen(strDesc));
-			Buffer[strlen(strDesc)] = '\0';
-			*BufferSize = (strlen((char *)Buffer)) * 2;
-			for (i = strlen((char *)Buffer); i > 0; i--)
-			{
-				Buffer[i*2] = Buffer[i];
-				Buffer[(i*2)-1] = 0;
-			}
+			if (!Stream_EnsureRemainingCapacity(Buffer, strlen(strDesc) * sizeof(UINT16) + 6))
+				return FALSE;
+
+			Stream_Write_UINT32(Buffer, strlen(strDesc));
+			for (i=0; i<strlen(strDesc); i++)
+				Stream_Write_UINT16(Buffer, strDesc[i]);
 		}
+		else if (!Stream_EnsureRemainingCapacity(Buffer, (ret - 2) + 6))
+				return FALSE;
 		else
 		{
-			*BufferSize = ret;
+			Stream_Write_UINT32(Buffer, (ret - 2) / 2);
+			Stream_Write(Buffer, &descriptor[2], ret-2);
 		}
-
+		Stream_Write_UINT16(Buffer, 0x0000);
 		break;
 	case DeviceTextLocationInformation:
 		bus_number = libusb_get_bus_number(pdev->libusb_dev);
 		device_address = libusb_get_device_address(pdev->libusb_dev);
-		sprintf(deviceLocation, "Port_#%04d.Hub_#%04d", device_address, bus_number);
+		_snprintf(deviceLocation, sizeof(deviceLocation), "Port_#%04d.Hub_#%04d",
+				  device_address, bus_number);
 
-		for(i=0;i<strlen(deviceLocation);i++){
-			Buffer[i*2] = (BYTE)deviceLocation[i];
-			Buffer[(i*2)+1] = 0;
-		}
-		*BufferSize = (i*2);
+		if (!Stream_EnsureRemainingCapacity(Buffer, strlen(deviceLocation) * sizeof(UINT16)))
+			return FALSE;
+
+		for(i=0;i<strlen(deviceLocation);i++)
+			Stream_Write_UINT16(Buffer, deviceLocation[i]);
 		break;
 	default:
-		WLog_DBG(TAG,"Query Text: unknown TextType %d", TextType);
+		WLog_WARN(TAG,"Query Text: unknown TextType %d", TextType);
 		break;
 	}
 
-	return 0;
+	return TRUE;
 }
 
 

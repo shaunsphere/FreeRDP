@@ -363,16 +363,16 @@ static UINT urbdrc_process_internal_io_control(URBDRC_CHANNEL_CALLBACK* callback
 	return CHANNEL_RC_OK;
 }
 
-static int urbdrc_process_query_device_text(URBDRC_CHANNEL_CALLBACK* callback, wStream* data,
+static UINT urbdrc_process_query_device_text(URBDRC_CHANNEL_CALLBACK* callback, wStream* data,
 											UINT32 MessageId, IUDEVMAN* udevman, UINT32 UsbDevice)
 {
+	UINT rc;
 	IUDEVICE* pdev;
 	UINT32 InterfaceId;
 	UINT32 TextType;
 	UINT32 LocaleId;
 	UINT32 bufferSize = 1024;
 	wStream* out_data;
-	BYTE DeviceDescription[bufferSize];
 
 	if (Stream_GetRemainingLength(data) < 8)
 		return ERROR_INVALID_DATA;
@@ -385,8 +385,6 @@ static int urbdrc_process_query_device_text(URBDRC_CHANNEL_CALLBACK* callback, w
 	if (pdev == NULL)
 		return CHANNEL_RC_OK;
 
-	pdev->control_query_device_text(pdev, TextType, LocaleId, &bufferSize, DeviceDescription);
-
 	InterfaceId = ((STREAM_ID_STUB << 30) | UsbDevice);
 
 	out_data = Stream_New(NULL, 18 + bufferSize);
@@ -396,14 +394,8 @@ static int urbdrc_process_query_device_text(URBDRC_CHANNEL_CALLBACK* callback, w
 	Stream_Write_UINT32(out_data, InterfaceId); /** interface */
 	Stream_Write_UINT32(out_data, MessageId); /** message id */
 
-	if (bufferSize != 0)
-	{
-		Stream_Write_UINT32(out_data, (bufferSize/2)+1); /** cchDeviceDescription */
-		Stream_Write(out_data, DeviceDescription, bufferSize);
-		Stream_Write_UINT16(out_data, 0x0000);
-	}
-	else
-		Stream_Write_UINT32(out_data, 0); /** cchDeviceDescription */
+	if (!pdev->control_query_device_text(pdev, TextType, LocaleId, out_data))
+		return ERROR_INTERNAL_ERROR;
 
 	Stream_Write_UINT32(out_data, 0); /** HResult */
 	Stream_SealLength(out_data);
