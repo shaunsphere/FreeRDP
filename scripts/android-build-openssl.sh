@@ -5,7 +5,9 @@ SCM_TAG=master
 
 COMPILER=4.9
 
-source $(dirname "${BASH_SOURCE[0]}")/android-build-common.sh
+SCRIPT_PATH=$(dirname "${BASH_SOURCE[0]}")
+SCRIPT_PATH=$(realpath "$SCRIPT_PATH")
+source $SCRIPT_PATH/android-build-common.sh
 
 function build {
 	if [ $# -ne 5 ];
@@ -47,7 +49,8 @@ function build {
 	common_run cd $BUILD_SRC
 	common_run git clean -xdf
 	common_run ./Configure --openssldir=$DST_DIR $CONFIG shared
-	common_run make -j build_libs
+    common_run make depend
+	common_run make build_libs
 
 	if [ ! -d $DST_DIR ];
 	then
@@ -68,7 +71,8 @@ common_clean $BUILD_DST
 # Patch openssl
 BASE=$(pwd)
 common_run cd $BUILD_SRC
-common_run git am $(dirname "${BASH_SOURCE[0]}")/openssl-disable-library-versioning.patch
+common_run git am $SCRIPT_PATH/openssl-disable-library-versioning.patch
+common_run git am $SCRIPT_PATH/openssl-64arch.patch
 common_run cd $BASE
 
 ORG_PATH=$PATH
@@ -89,10 +93,8 @@ do
 			$ARCH "mipsel-linux-android-" "arch-mips"
 		 ;;
 	 "mips64")
-		echo "[WARNING] Skipping unsupported architecture $ARCH"
-		continue
-		 build "android-mips" "mipsel-linux-android-" \
-			$ARCH "mipsel-linux-android-" "arch-mips"
+		 build "android-mips64" "mips64el-linux-android-" \
+			$ARCH "mips64el-linux-android-" "arch-mips64"
 		 ;;
 	 "x86")
 		 build "android-x86" "i686-linux-android-" \
