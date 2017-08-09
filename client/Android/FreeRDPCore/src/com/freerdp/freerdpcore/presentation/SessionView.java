@@ -28,6 +28,8 @@ import com.freerdp.freerdpcore.utils.GestureDetector;
 
 public class SessionView extends View
 {
+	private static final String TAG = "SessionView";
+
 	public interface SessionViewListener {
 		abstract void onSessionViewBeginTouch();
 		abstract void onSessionViewEndTouch();
@@ -291,7 +293,7 @@ public class SessionView extends View
 
 	@Override
 	public void onMeasure(int widthMeasureSpec, int heightMeasureSpec) {
-		Log.v("SessionView", width + "x" + height);
+		Log.v(TAG, width + "x" + height);
 		this.setMeasuredDimension((int)(width * scaleFactor) + touchPointerPaddingWidth, (int)(height * scaleFactor) + touchPointerPaddingHeight);	
 	}
 

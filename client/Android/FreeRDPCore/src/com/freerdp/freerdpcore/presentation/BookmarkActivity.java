@@ -20,7 +20,6 @@ import com.freerdp.freerdpcore.domain.ConnectionReference;
 import com.freerdp.freerdpcore.domain.ManualBookmark;
 import com.freerdp.freerdpcore.services.BookmarkBaseGateway;
 import com.freerdp.freerdpcore.utils.RDPFileParser;
-import com.freerdp.freerdpcore.utils.BuildConfiguration;
 
 import android.app.AlertDialog;
 import android.content.ComponentName;
@@ -170,16 +169,6 @@ public class BookmarkActivity extends PreferenceActivity implements
 		} else {
 			addPreferencesFromResource(R.xml.bookmark_settings);
 			current_preferences = PREFERENCES_BOOKMARK;
-		}
-
-		// Hide debug settings, if not activated.
-		if (!BuildConfiguration.WITH_ANDROID_DEBUG_MENU
-				.equalsIgnoreCase("ON")) {
-			Preference pref = findPreference("bookmark.debug");
-			PreferenceCategory cat = (PreferenceCategory)findPreference("category.settings");
-			if (pref != null) {
-				cat.removePreference(pref);
-			}
 		}
 
 		// update UI with bookmark data
@@ -483,8 +472,8 @@ public class BookmarkActivity extends PreferenceActivity implements
 			ListPreference listPreference = (ListPreference) findPreference(key);
 			listPreference.setSummary(listPreference.getEntry());
 
-			boolean enabled = listPreference.getValue().equalsIgnoreCase(
-					getResources().getString(R.string.resolution_custom));
+			String value = listPreference.getValue();
+			boolean enabled = value.equalsIgnoreCase("custom");
 			if (key.equals("bookmark.resolution")) {
 				findPreference("bookmark.width").setEnabled(enabled);
 				findPreference("bookmark.height").setEnabled(enabled);
@@ -521,7 +510,7 @@ public class BookmarkActivity extends PreferenceActivity implements
 	private void debugSettingsChanged(SharedPreferences sharedPreferences,
 			String key) {
 		if (key.equals("bookmark.debug_level")) {
-			int level = sharedPreferences.getInt(key, 0);
+			String level = sharedPreferences.getString(key, "INFO");
 			Preference pref = findPreference("bookmark.debug_level");
 			pref.setDefaultValue(level);
 		} else if (key.equals("bookmark.async_channel")) {
@@ -586,7 +575,7 @@ public class BookmarkActivity extends PreferenceActivity implements
 		if (!verifyFailed && sharedPreferences.getInt("bookmark.port", -1) <= 0)
 			verifyFailed = true;
 
-		// if an error occured - display toast and return false
+		// if an error occurred - display toast and return false
 		return (!verifyFailed);
 	}
 

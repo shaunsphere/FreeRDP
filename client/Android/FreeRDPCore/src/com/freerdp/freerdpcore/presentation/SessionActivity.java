@@ -29,6 +29,7 @@ import android.graphics.Rect;
 import android.graphics.drawable.BitmapDrawable;
 import android.inputmethodservice.Keyboard;
 import android.inputmethodservice.KeyboardView;
+import android.net.Uri;
 import android.os.Build;
 import android.os.Bundle;
 import android.os.Handler;
@@ -83,71 +84,71 @@ public class SessionActivity extends ActionBarActivity implements
 		@Override
 		public void handleMessage(Message msg) {
 			switch (msg.what) {
-			case GRAPHICS_CHANGED: {
-				sessionView.onSurfaceChange(session);
-				scrollView.requestLayout();
-				break;
-			}
-			case REFRESH_SESSIONVIEW: {
-				sessionView.invalidateRegion();
-				break;
-			}
-			case DISPLAY_TOAST: {
-				Toast errorToast = Toast.makeText(getApplicationContext(),
-						msg.obj.toString(), Toast.LENGTH_LONG);
-				errorToast.show();
-				break;
-			}
-			case HIDE_ZOOMCONTROLS: {
-				zoomControls.hide();
-				break;
-			}
-			case SEND_MOVE_EVENT: {
-				LibFreeRDP.sendCursorEvent(session.getInstance(), msg.arg1,
-						msg.arg2, Mouse.getMoveEvent());
-				break;
-			}
-			case SHOW_DIALOG: {
-				// create and show the dialog
-				((Dialog) msg.obj).show();
-				break;
-			}
-			case SCROLLING_REQUESTED: {
-				int scrollX = 0;
-				int scrollY = 0;
-				float[] pointerPos = touchPointerView.getPointerPosition();
+				case GRAPHICS_CHANGED: {
+					sessionView.onSurfaceChange(session);
+					scrollView.requestLayout();
+					break;
+				}
+				case REFRESH_SESSIONVIEW: {
+					sessionView.invalidateRegion();
+					break;
+				}
+				case DISPLAY_TOAST: {
+					Toast errorToast = Toast.makeText(getApplicationContext(),
+							msg.obj.toString(), Toast.LENGTH_LONG);
+					errorToast.show();
+					break;
+				}
+				case HIDE_ZOOMCONTROLS: {
+					zoomControls.hide();
+					break;
+				}
+				case SEND_MOVE_EVENT: {
+					LibFreeRDP.sendCursorEvent(session.getInstance(), msg.arg1,
+							msg.arg2, Mouse.getMoveEvent());
+					break;
+				}
+				case SHOW_DIALOG: {
+					// create and show the dialog
+					((Dialog) msg.obj).show();
+					break;
+				}
+				case SCROLLING_REQUESTED: {
+					int scrollX = 0;
+					int scrollY = 0;
+					float[] pointerPos = touchPointerView.getPointerPosition();
 
-				if (pointerPos[0] > (screen_width - touchPointerView
-						.getPointerWidth()))
-					scrollX = SCROLLING_DISTANCE;
-				else if (pointerPos[0] < 0)
-					scrollX = -SCROLLING_DISTANCE;
+					if (pointerPos[0] > (screen_width - touchPointerView
+							.getPointerWidth()))
+						scrollX = SCROLLING_DISTANCE;
+					else if (pointerPos[0] < 0)
+						scrollX = -SCROLLING_DISTANCE;
 
-				if (pointerPos[1] > (screen_height - touchPointerView
-						.getPointerHeight()))
-					scrollY = SCROLLING_DISTANCE;
-				else if (pointerPos[1] < 0)
-					scrollY = -SCROLLING_DISTANCE;
+					if (pointerPos[1] > (screen_height - touchPointerView
+							.getPointerHeight()))
+						scrollY = SCROLLING_DISTANCE;
+					else if (pointerPos[1] < 0)
+						scrollY = -SCROLLING_DISTANCE;
 
-				scrollView.scrollBy(scrollX, scrollY);
+					scrollView.scrollBy(scrollX, scrollY);
 
-				// see if we reached the min/max scroll positions
-				if (scrollView.getScrollX() == 0
-						|| scrollView.getScrollX() == (sessionView.getWidth() - scrollView
-								.getWidth()))
-					scrollX = 0;
-				if (scrollView.getScrollY() == 0
-						|| scrollView.getScrollY() == (sessionView.getHeight() - scrollView
-								.getHeight()))
-					scrollY = 0;
+					// see if we reached the min/max scroll positions
+					if (scrollView.getScrollX() == 0
+							|| scrollView.getScrollX() == (sessionView.getWidth() - scrollView
+							.getWidth()))
+						scrollX = 0;
+					if (scrollView.getScrollY() == 0
+							|| scrollView.getScrollY() == (sessionView.getHeight() - scrollView
+							.getHeight()))
+						scrollY = 0;
 
-				if (scrollX != 0 || scrollY != 0)
-					uiHandler.sendEmptyMessageDelayed(SCROLLING_REQUESTED,
-							SCROLLING_TIMEOUT);
-				else
-					Log.v(TAG, "Stopping auto-scroll");
-				break;
-			}
+					if (scrollX != 0 || scrollY != 0)
+						uiHandler.sendEmptyMessageDelayed(SCROLLING_REQUESTED,
+								SCROLLING_TIMEOUT);
+					else
+						Log.v(TAG, "Stopping auto-scroll");
+					break;
+				}
 			}
 		}
 	}
@@ -216,16 +217,16 @@ public class SessionActivity extends ActionBarActivity implements
 				return;
 
 			switch (intent.getExtras().getInt(GlobalApp.EVENT_TYPE, -1)) {
-			case GlobalApp.FREERDP_EVENT_CONNECTION_SUCCESS:
-				OnConnectionSuccess(context);
-				break;
+				case GlobalApp.FREERDP_EVENT_CONNECTION_SUCCESS:
+					OnConnectionSuccess(context);
+					break;
 
-			case GlobalApp.FREERDP_EVENT_CONNECTION_FAILURE:
-				OnConnectionFailure(context);
-				break;
-			case GlobalApp.FREERDP_EVENT_DISCONNECTED:
-				OnDisconnected(context);
-				break;
+				case GlobalApp.FREERDP_EVENT_CONNECTION_FAILURE:
+					OnConnectionFailure(context);
+					break;
+				case GlobalApp.FREERDP_EVENT_DISCONNECTED:
+					OnDisconnected(context);
+					break;
 			}
 		}
 
@@ -240,6 +241,11 @@ public class SessionActivity extends ActionBarActivity implements
 				progressDialog = null;
 			}
 
+			if (session.getBookmark() == null) {
+				// Return immediately if we launch from URI
+				return;
+			}
+
 			// add hostname to history if quick connect was used
 			Bundle bundle = getIntent().getExtras();
 			if (bundle != null
@@ -247,7 +253,7 @@ public class SessionActivity extends ActionBarActivity implements
 				if (ConnectionReference.isHostnameReference(bundle
 						.getString(PARAM_CONNECTION_REFERENCE))) {
 					assert session.getBookmark().getType() == BookmarkBase.TYPE_MANUAL;
-					String item = session.getBookmark().<ManualBookmark> get()
+					String item = session.getBookmark().<ManualBookmark>get()
 							.getHostname();
 					if (!GlobalApp.getQuickConnectHistoryGateway()
 							.historyItemExists(item))
@@ -361,7 +367,7 @@ public class SessionActivity extends ActionBarActivity implements
 						new DialogInterface.OnClickListener() {
 							@Override
 							public void onClick(DialogInterface dialog,
-									int which) {
+												int which) {
 								callbackDialogResult = true;
 								synchronized (dialog) {
 									dialog.notify();
@@ -372,7 +378,7 @@ public class SessionActivity extends ActionBarActivity implements
 						new DialogInterface.OnClickListener() {
 							@Override
 							public void onClick(DialogInterface dialog,
-									int which) {
+												int which) {
 								callbackDialogResult = false;
 								connectCancelledByUser = true;
 								synchronized (dialog) {
@@ -391,7 +397,7 @@ public class SessionActivity extends ActionBarActivity implements
 						new DialogInterface.OnClickListener() {
 							@Override
 							public void onClick(DialogInterface dialog,
-									int which) {
+												int which) {
 								callbackDialogResult = true;
 								synchronized (dialog) {
 									dialog.notify();
@@ -402,7 +408,7 @@ public class SessionActivity extends ActionBarActivity implements
 						new DialogInterface.OnClickListener() {
 							@Override
 							public void onClick(DialogInterface dialog,
-									int which) {
+												int which) {
 								callbackDialogResult = false;
 								connectCancelledByUser = true;
 								synchronized (dialog) {
@@ -415,14 +421,14 @@ public class SessionActivity extends ActionBarActivity implements
 	private boolean hasHardwareMenuButton() {
 		if (Build.VERSION.SDK_INT <= 10)
 			return true;
-		
+
 		if (Build.VERSION.SDK_INT >= 14) {
 			boolean rc = false;
 			final ViewConfiguration cfg = ViewConfiguration.get(this);
-						
+
 			return cfg.hasPermanentMenuKey();
 		}
-		
+
 		return false;
 	}
 
@@ -614,9 +620,14 @@ public class SessionActivity extends ActionBarActivity implements
 	}
 
 	private void processIntent(Intent intent) {
-		// get either session instance or create one from a bookmark
+		// get either session instance or create one from a bookmark/uri
 		Bundle bundle = intent.getExtras();
-		if (bundle.containsKey(PARAM_INSTANCE)) {
+		Uri openUri = intent.getData();
+		if (openUri != null) {
+			// Launched from URI, e.g:
+			// freerdp://user@ip:port/connect?sound=&rfx=&p=password&clipboard=%2b&themes=-
+			connect(openUri);
+		} else if (bundle.containsKey(PARAM_INSTANCE)) {
 			int inst = bundle.getInt(PARAM_INSTANCE);
 			session = GlobalApp.getSession(inst);
 			bitmap = session.getSurface().getBitmap();
@@ -626,7 +637,7 @@ public class SessionActivity extends ActionBarActivity implements
 			String refStr = bundle.getString(PARAM_CONNECTION_REFERENCE);
 			if (ConnectionReference.isHostnameReference(refStr)) {
 				bookmark = new ManualBookmark();
-				bookmark.<ManualBookmark> get().setHostname(
+				bookmark.<ManualBookmark>get().setHostname(
 						ConnectionReference.getHostname(refStr));
 			} else if (ConnectionReference.isBookmarkReference(refStr)) {
 				if (ConnectionReference.isManualBookmarkReference(refStr))
@@ -647,12 +658,7 @@ public class SessionActivity extends ActionBarActivity implements
 	}
 
 	private void connect(BookmarkBase bookmark) {
-		session = GlobalApp.createSession(bookmark);
-		session.setUIEventListener(this);
-
-		// set writeable data directory
-		LibFreeRDP.setDataDirectory(session.getInstance(), getFilesDir()
-				.toString());
+		session = GlobalApp.createSession(bookmark, getApplicationContext());
 
 		BookmarkBase.ScreenSettings screenSettings = session.getBookmark()
 				.getActiveScreenSettings();
@@ -677,8 +683,20 @@ public class SessionActivity extends ActionBarActivity implements
 			screenSettings.setWidth(screen_width);
 		}
 
+		connectWithTitle(bookmark.getLabel());
+	}
+
+	private void connect(Uri openUri) {
+		session = GlobalApp.createSession(openUri, getApplicationContext());
+
+		connectWithTitle(openUri.getAuthority());
+	}
+
+	private void connectWithTitle(String title) {
+		session.setUIEventListener(this);
+
 		progressDialog = new ProgressDialog(this);
-		progressDialog.setTitle(bookmark.getLabel());
+		progressDialog.setTitle(title);
 		progressDialog.setMessage(getResources().getText(
 				R.string.dlg_msg_connecting));
 		progressDialog.setButton(ProgressDialog.BUTTON_NEGATIVE, "Cancel",
@@ -703,7 +721,7 @@ public class SessionActivity extends ActionBarActivity implements
 	// binds the current session to the activity by wiring it up with the
 	// sessionView and updating all internal objects accordingly
 	private void bindSession() {
-		Log.v("SessionActivity", "bindSession called");
+		Log.v(TAG, "bindSession called");
 		session.setUIEventListener(this);
 		sessionView.onSurfaceChange(session);
 		scrollView.requestLayout();
@@ -712,7 +730,7 @@ public class SessionActivity extends ActionBarActivity implements
 
 	// displays either the system or the extended keyboard or non of them
 	private void showKeyboard(boolean showSystemKeyboard,
-			boolean showExtendedKeyboard) {
+							  boolean showExtendedKeyboard) {
 		// no matter what we are doing ... hide the zoom controls
 		// TODO: this is not working correctly as hiding the keyboard issues a
 		// onScrollChange notification showing the control again ...
@@ -769,25 +787,25 @@ public class SessionActivity extends ActionBarActivity implements
 		// check if any key is in the keycodes list
 
 		List<Keyboard.Key> keys = modifiersKeyboard.getKeys();
-		for (Iterator<Keyboard.Key> it = keys.iterator(); it.hasNext();) {
+		for (Iterator<Keyboard.Key> it = keys.iterator(); it.hasNext(); ) {
 			// if the key is a sticky key - just set it to off
 			Keyboard.Key curKey = it.next();
 			if (curKey.sticky) {
 				switch (keyboardMapper.getModifierState(curKey.codes[0])) {
-				case KeyboardMapper.KEYSTATE_ON:
-					curKey.on = true;
-					curKey.pressed = false;
-					break;
+					case KeyboardMapper.KEYSTATE_ON:
+						curKey.on = true;
+						curKey.pressed = false;
+						break;
 
-				case KeyboardMapper.KEYSTATE_OFF:
-					curKey.on = false;
-					curKey.pressed = false;
-					break;
+					case KeyboardMapper.KEYSTATE_OFF:
+						curKey.on = false;
+						curKey.pressed = false;
+						break;
 
-				case KeyboardMapper.KEYSTATE_LOCKED:
-					curKey.on = true;
-					curKey.pressed = true;
-					break;
+					case KeyboardMapper.KEYSTATE_LOCKED:
+						curKey.on = true;
+						curKey.pressed = true;
+						break;
 				}
 			}
 		}
@@ -858,6 +876,15 @@ public class SessionActivity extends ActionBarActivity implements
 			showKeyboard(false, false);
 		else
 			keyboardMapper.sendAltF4();
+	}
+
+	@Override
+	public boolean onKeyLongPress(int keyCode, KeyEvent event) {
+		if (keyCode == KeyEvent.KEYCODE_BACK) {
+			LibFreeRDP.disconnect(session.getInstance());
+			return true;
+		}
+		return super.onKeyLongPress(keyCode, event);
 	}
 
 	// android keyboard input handling
@@ -933,20 +960,20 @@ public class SessionActivity extends ActionBarActivity implements
 	@Override
 	public void switchKeyboard(int keyboardType) {
 		switch (keyboardType) {
-		case KeyboardMapper.KEYBOARD_TYPE_FUNCTIONKEYS:
-			keyboardView.setKeyboard(specialkeysKeyboard);
-			break;
+			case KeyboardMapper.KEYBOARD_TYPE_FUNCTIONKEYS:
+				keyboardView.setKeyboard(specialkeysKeyboard);
+				break;
 
-		case KeyboardMapper.KEYBOARD_TYPE_NUMPAD:
-			keyboardView.setKeyboard(numpadKeyboard);
-			break;
+			case KeyboardMapper.KEYBOARD_TYPE_NUMPAD:
+				keyboardView.setKeyboard(numpadKeyboard);
+				break;
 
-		case KeyboardMapper.KEYBOARD_TYPE_CURSOR:
-			keyboardView.setKeyboard(cursorKeyboard);
-			break;
+			case KeyboardMapper.KEYBOARD_TYPE_CURSOR:
+				keyboardView.setKeyboard(cursorKeyboard);
+				break;
 
-		default:
-			break;
+			default:
+				break;
 		}
 	}
 
@@ -966,6 +993,11 @@ public class SessionActivity extends ActionBarActivity implements
 			bitmap = Bitmap.createBitmap(width, height, Config.RGB_565);
 
 		session.setSurface(new BitmapDrawable(bitmap));
+
+		if (session.getBookmark() == null) {
+			// Return immediately if we launch from URI
+			return;
+		}
 
 		// check this settings and initial settings - if they are not equal the
 		// server doesn't support our settings
@@ -1020,7 +1052,7 @@ public class SessionActivity extends ActionBarActivity implements
 
 	@Override
 	public boolean OnAuthenticate(StringBuilder username, StringBuilder domain,
-			StringBuilder password) {
+								  StringBuilder password) {
 		// this is where the return code of our dialog will be stored
 		callbackDialogResult = false;
 
@@ -1061,12 +1093,51 @@ public class SessionActivity extends ActionBarActivity implements
 	}
 
 	@Override
-	public boolean OnVerifiyCertificate(String subject, String issuer,
-			String fingerprint) {
+	public boolean OnGatewayAuthenticate(StringBuilder username, StringBuilder domain, StringBuilder password) {
+		// this is where the return code of our dialog will be stored
+		callbackDialogResult = false;
 
+		// set text fields
+		((EditText) userCredView.findViewById(R.id.editTextUsername))
+				.setText(username);
+		((EditText) userCredView.findViewById(R.id.editTextDomain))
+				.setText(domain);
+		((EditText) userCredView.findViewById(R.id.editTextPassword))
+				.setText(password);
+
+		// start dialog in UI thread
+		uiHandler.sendMessage(Message.obtain(null, UIHandler.SHOW_DIALOG,
+				dlgUserCredentials));
+
+		// wait for result
+		try {
+			synchronized (dlgUserCredentials) {
+				dlgUserCredentials.wait();
+			}
+		} catch (InterruptedException e) {
+		}
+
+		// clear buffers
+		username.setLength(0);
+		domain.setLength(0);
+		password.setLength(0);
+
+		// read back user credentials
+		username.append(((EditText) userCredView
+				.findViewById(R.id.editTextUsername)).getText().toString());
+		domain.append(((EditText) userCredView
+				.findViewById(R.id.editTextDomain)).getText().toString());
+		password.append(((EditText) userCredView
+				.findViewById(R.id.editTextPassword)).getText().toString());
+
+		return callbackDialogResult;
+	}
+
+	@Override
+	public int OnVerifiyCertificate(String commonName, String subject, String issuer, String fingerprint, boolean mismatch) {
 		// see if global settings says accept all
 		if (GlobalSettings.getAcceptAllCertificates())
-			return true;
+			return 0;
 
 		// this is where the return code of our dialog will be stored
 		callbackDialogResult = false;
@@ -1090,7 +1161,38 @@ public class SessionActivity extends ActionBarActivity implements
 		} catch (InterruptedException e) {
 		}
 
-		return callbackDialogResult;
+		return callbackDialogResult ? 1 : 0;
+	}
+
+	@Override
+	public int OnVerifyChangedCertificate(String commonName, String subject, String issuer, String fingerprint, String oldSubject, String oldIssuer, String oldFingerprint) {
+		// see if global settings says accept all
+		if (GlobalSettings.getAcceptAllCertificates())
+			return 0;
+
+		// this is where the return code of our dialog will be stored
+		callbackDialogResult = false;
+
+		// set message
+		String msg = getResources().getString(
+				R.string.dlg_msg_verify_certificate);
+		msg = msg + "\n\nSubject: " + subject + "\nIssuer: " + issuer
+				+ "\nFingerprint: " + fingerprint;
+		dlgVerifyCertificate.setMessage(msg);
+
+		// start dialog in UI thread
+		uiHandler.sendMessage(Message.obtain(null, UIHandler.SHOW_DIALOG,
+				dlgVerifyCertificate));
+
+		// wait for result
+		try {
+			synchronized (dlgVerifyCertificate) {
+				dlgVerifyCertificate.wait();
+			}
+		} catch (InterruptedException e) {
+		}
+
+		return callbackDialogResult ? 1 : 0;
 	}
 
 	@Override
@@ -1109,7 +1211,7 @@ public class SessionActivity extends ActionBarActivity implements
 
 	@Override
 	public void onScrollChanged(ScrollView2D scrollView, int x, int y,
-			int oldx, int oldy) {
+								int oldx, int oldy) {
 		zoomControls.setIsZoomInEnabled(!sessionView.isAtMaxZoom());
 		zoomControls.setIsZoomOutEnabled(!sessionView.isAtMinZoom());
 		if (!GlobalSettings.getHideZoomControls()
