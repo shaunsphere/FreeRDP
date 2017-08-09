@@ -70,7 +70,6 @@ typedef BOOL (*pMouseEvent)(rdpInput* input, UINT16 flags, UINT16 x, UINT16 y);
 typedef BOOL (*pExtendedMouseEvent)(rdpInput* input, UINT16 flags, UINT16 x, UINT16 y);
 typedef BOOL (*pFocusInEvent)(rdpInput* input, UINT16 toggleStates);
 typedef BOOL (*pKeyboardPauseEvent)(rdpInput* input);
-
 struct rdp_input
 {
 	rdpContext* context; /* 0 */
